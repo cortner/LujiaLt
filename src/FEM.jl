@@ -5,7 +5,15 @@
 Module that collects some basic finite element functionality for
 application with the Cauchy--Born model. 
 
-## List of types
+## Quick example
+
+```
+using LujiaLt.FEM
+tri = Triangulation(rand(2, 10))
+plot(tri; xradius=0.02)
+```
+
+## List of types and methods
 
 Look at the respective documentions for more info.
 
@@ -17,7 +25,7 @@ Look at the respective documentions for more info.
 
 ## Dependencies:
 
-* Gadfly for plotting 
+* Compose for plotting 
 * PyCall for calling Python Triangle
 * [Python Triangle](https://github.com/drufat/triangle)
 
@@ -154,9 +162,7 @@ function _edges_(tri::Triangulation)
     return unique(S, 2)
 end
 
-# function plot(tri::Triangulation)
-#     Gadfly.plot(x=tri.X[1,:], y=tri.X[2,:])
-# end
+
 
 function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato", 
               buffer=2*xradius, elcol = "aliceblue", linecol="darkblue",
@@ -175,24 +181,20 @@ function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
     end
     ub = UnitBox(xLim[1], yLim[1], dat_width, dat_height)
     
-    # draw the segments
-#     E = FEM._edges_(tri)
-#     c_ctx = context(units=ub)
-#     for n = 1:size(E, 2)
-#         c_ctx = compoe( c_ctx, line([ tuple(tri.X[:,E[1,n]]...), tuple(tri.X[:,E[2,n]]...) ]) )
-#     end
-#     c_ctx = compose(c_ctx, stroke("cadetblue") ) # , linewidth(1mm))
-    
+    # draw the elements
     c_ctx = context(units=ub)
     for n = 1:FEM.nT(tri)
         p = tri.X[:, tri.T[:, n]]
-        c_ctx = compose(c_ctx, polygon( [tuple(p[:,1]...), tuple(p[:,2]...), tuple(p[:,3]...)] ))
+        c_ctx = compose(c_ctx, polygon( [tuple(p[:,1]...),
+                                         tuple(p[:,2]...),
+                                         tuple(p[:,3]...)] ))
     end
     c_ctx = compose(c_ctx, fill(elcol), stroke(linecol), linewidth(lwidth))
     
     # draw the atoms
     a_ctx = context(units=ub)
-    a_ctx = compose(a_ctx, circle(tri.X[1,:][:], tri.X[2,:][:], xradius * ones(FEM.nX(tri))), 
+    a_ctx = compose(a_ctx,
+                    circle(tri.X[1,:], tri.X[2,:], xradius), 
                     fill(atcol), stroke(linecol) )
     
     return compose(context(), a_ctx, c_ctx)
