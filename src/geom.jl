@@ -1,4 +1,5 @@
 
+export Domain
 
 
 #
@@ -33,8 +34,8 @@ end
 
 
 # usual trick to allow more parameters to be stored
-getindex(geom::Domain, idx) = geom.info[idx]
-setindex!(geom::Domain, val, idx) = (geom.info[idx] = val)
+Base.getindex(geom::Domain, idx) = geom.info[idx]
+Base.setindex!(geom::Domain, val, idx) = (geom.info[idx] = val)
    
 "auxiliary function ala meshgrid"
 2grid{T}(x::Vector{T}, y::Vector{T}) = x .+ ones(T, y)', ones(T, x) .+ y'
@@ -161,11 +162,6 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     end
 
     return geom
-end
-
-
-function compose_atoms(Y)
-    
 end
 
 

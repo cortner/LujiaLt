@@ -1,2 +1,5 @@
-# Lujia-Lt
-A Julia library for experimentation with multi-scale algorithms for materials science.
+
+# Lujia-Light
+
+A Julia library for numerical analysis experimentats with multi-scale algorithms
+for materials science.
