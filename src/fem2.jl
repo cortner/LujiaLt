@@ -155,20 +155,24 @@ locate(P::Matrix{Float64}, tri::Triangulation) = tri.pyo[:find_simplex](P') + 1
 
 function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato", 
               buffer=2*xradius, elcol = "aliceblue", linecol="darkblue",
-              lwidth=1.0)
-    
-    # create a canvas
-    xLim = [extrema(tri.X[1,:])...]
-    dat_width = xLim[2]-xLim[1]
-    yLim = [extrema(tri.X[2,:])...]
-    dat_height = yLim[2]-yLim[1]
-    xLim[1] -= buffer; xLim[2] += buffer; dat_width = xLim[2]-xLim[1]
-    yLim[1] -= buffer; yLim[2] += buffer; dat_height = yLim[2]-yLim[1]
+              lwidth=1.0, axis=:ignore)
 
-    if height == :auto
-        height = width * (dat_height / dat_width)
+    if axis == :ignore
+        # create a canvas
+        xLim = [extrema(tri.X[1,:])...]
+        dat_width = xLim[2]-xLim[1]
+        yLim = [extrema(tri.X[2,:])...]
+        dat_height = yLim[2]-yLim[1]
+        xLim[1] -= buffer; xLim[2] += buffer; dat_width = xLim[2]-xLim[1]
+        yLim[1] -= buffer; yLim[2] += buffer; dat_height = yLim[2]-yLim[1]
+        
+        if height == :auto
+            height = width * (dat_height / dat_width)
+        end
+        ub = UnitBox(xLim[1], yLim[1], dat_width, dat_height)
+    else
+        ub = UnitBox(axis[1], axis[2], axis[3], axis[4])
     end
-    ub = UnitBox(xLim[1], yLim[1], dat_width, dat_height)
     
     # draw the elements
     points = Tuple{Float64, Float64}[]
@@ -193,9 +197,7 @@ function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
     return compose(context(), a_ctx, c_ctx)
 end
 
-
-end
-
+end # module FEM
 
 
 # """compute unique set of edges: for now this is an auxiliary function use
