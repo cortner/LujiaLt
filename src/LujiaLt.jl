@@ -7,12 +7,15 @@ module LujiaLt
 
 # basic molecular dynamics stuff: in particular a neighbourlist
 include("mdtools.jl")
+
 # some simple mad-up interatomic potentials
 include("potentials.jl")
+
 # some basic FEM methodology
 include("fem.jl")
 
-
+# this type is not in geom.jl because Plotting depends on it
+# while geom again depends on Plotting.
 """Basic Lujia-Lt geometry type
 * `X` : physical reference coordinates (both atomistic and FEM)
 * `Z` : lattice index (integer) reference coordinates
@@ -37,11 +40,17 @@ end
 export Domain
 
 
-
 # sub-modules
 include("plotting.jl")
 
 # parts of main-module
 include("geom.jl")
+
+# assembly routines
+include("assemble.jl")
+
+# codes to help test the package
+include("testing.jl")
+
 
 end

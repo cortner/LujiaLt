@@ -145,6 +145,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     end
     
     # create a triangulation
+    # TODO: CURRENTLY WE DO THIS TWICE!!!!! (again after introducing the defect)
     X = reshape(X, 2, length(X) ÷ 2)
     tri = FEM.Triangulation(X)
     
@@ -154,10 +155,10 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     # construct some defects (if requested by the user)
     if A == nothing
         # note that we are currently assuming that the lattice is
-        # the triangulat lattice!
+        # the triangular lattice!
         if defect == :vacancy
-            I0 = find( dist(X .< 0.1) )
-            remove_atom!(geom, I0)
+            I0 = find( dist(X) .< 0.1 )
+            remove_atom!(geom, I0[1])
         elseif defect == :interstitial
             add_atom!(geom, [0.5;0.0])
         elseif defect != :none
@@ -167,6 +168,31 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     
     return geom
 end
+
+
+"number of nodes (not free nodes!)"
+nX(geom::Domain) = size(geom.X, 2)
+
+
+
+"remove an atom from the geometry, usually to create a vacancy"
+function remove_atom!(geom::Domain, idx)
+    if geom.mark[idx] != 0
+        error("remove_atom! : only allowed to remove core atoms")
+    end
+    # TODO: if there are continuum nodes, then they are also included
+    # but not in Z!!!!
+    Iall = setdiff(1:nX(geom), idx)
+    geom.X = geom.X[:, Iall]
+    geom.mark = geom.mark[Iall]
+    Iat = setdiff(find(geom.mark .>= 0), idx)
+    geom.Z = geom.Z[:, Iat]
+    geom.nA = geom.nA - 1
+    # redo the triangulation
+    geom.tri = FEM.Triangulation(geom.X)
+end
+export remove_atom!
+
 
 
 """
