@@ -1,6 +1,5 @@
 
-export Domain
-
+using Compose
 
 #
 # here we collect some functions that generate and manipulate
@@ -10,27 +9,27 @@ export Domain
 const Atri=[1.0 cos(pi/3); 0.0 sin(pi/3)]
 
 
-"""Basic Lujia-Lt geometry type
-* `X` : physical reference coordinates (both atomistic and FEM)
-* `Z` : lattice index (integer) reference coordinates
-* `mark`: 0 = atomistic, > 0 atomistic, but not core, < 0 continuum node;
-     this gives users the flexibility to give more information to the markers
-* `A` : lattice matrix
+# """Basic Lujia-Lt geometry type
+# * `X` : physical reference coordinates (both atomistic and FEM)
+# * `Z` : lattice index (integer) reference coordinates
+# * `mark`: 0 = atomistic, > 0 atomistic, but not core, < 0 continuum node;
+#      this gives users the flexibility to give more information to the markers
+# * `A` : lattice matrix
 
-## Notes
+# ## Notes
 
-*  X[:, 1:nA] = A * Z are the atomistic nodes; in particular note that FEM nodes
-    don't have a corresponding Z entry
-"""
-type Domain
-    X::Matrix{Float64}
-    Z::Matrix{Int32}
-    mark::Vector{Int8}
-    A::Matrix{Float64}
-    nA::Int
-    tri::FEM.Triangulation
-    info::Dict
-end
+# *  X[:, 1:nA] = A * Z are the atomistic nodes; in particular note that FEM nodes
+#     don't have a corresponding Z entry
+# """
+# type Domain
+#     X::Matrix{Float64}
+#     Z::Matrix{Int32}
+#     mark::Vector{Int8}
+#     A::Matrix{Float64}
+#     nA::Int
+#     tri::FEM.Triangulation
+#     info::Dict
+# end
 
 
 # usual trick to allow more parameters to be stored
@@ -38,17 +37,20 @@ Base.getindex(geom::Domain, idx) = geom.info[idx]
 Base.setindex!(geom::Domain, val, idx) = (geom.info[idx] = val)
    
 "auxiliary function ala meshgrid"
-2grid{T}(x::Vector{T}, y::Vector{T}) = x .+ ones(T, y)', ones(T, x) .+ y'
+twogrid{T}(x::Vector{T}, y::Vector{T}) =
+    (x .+ ones(T, length(y))', ones(T, length(x)) .+ y')
+# twogrid(x, y) = twogrid(collect(x), collect(y))
 
 "turn 2grid into a list of points"
-function 2grid_list(x, y)
-    X, Y = 2grid(x, y)
+function twogrid_list(x, y)
+    X, Y = twogrid(collect(x), collect(y))
     return [X[:]'; Y[:]']
 end
 
 "compute distance of points from some point"
 dist(X, X0) = sqrt(sumabs2(X .- X0, 1));
 dist(X) = sqrt(sumabs2(X, 1))
+export dist
 
 
 """
@@ -93,10 +95,9 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     
     # generate a cubic portion of Zd containing -R/sig : R/sig in each
     # coordinate direction
-    sig = minimum(svd(A)[2])
+    sig = minimum(svd(AA)[2])
     ndim = ceil(Int, (Ra+Rbuf)/sig)
-    geom.I = zeros(Int, 2*ndim+1, 2*ndim+1)
-    Z = 2grid_list(-ndim:ndim, -ndim:ndim)
+    Z = twogrid_list(-ndim:ndim, -ndim:ndim)
     # convert to physical reference configuration
     X = AA * Z
     # keep only the points inside Ra+Rbuf
@@ -106,7 +107,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     # collect some information
     nA = length(I)    
     Ia_core = find( dist(X) .<= Ra )
-    mark = ones(int8, nA)    
+    mark = ones(Int8, nA)   
     mark[Ia_core] = 0
     
     # ============================
@@ -119,29 +120,32 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
         # requires Rc, before doing the actual assembly
         #####   <<<<<<<<  TODO
         #####
-        r = R0
         h = H0
+        r = R0-0.4*h
         layer = 0
         X = X[:]      # temporarily linearise the X array
         while r < Rc
             r += h
             layer -= 1
-            # the ring has diameter 2 π r
+            # the current ring has diameter 2 π r
             diam = 2 * π * r;
             # number of edges along this circle is ceil(diam / h)
             Nedges = ceil(diam/h)
             # create the new coordinates
-            θ = linspace(0, diam - diam/Nedges, Nedges)
-            Xnew = [r * cos(θ); r * sin(θ)]
+            θ = collect(linspace(0, 2*π - 2*π/Nedges, Nedges))
+            Xnew = [r * cos(θ)'; r * sin(θ)']
             mark_new = layer * ones(Int8, length(θ))
             # append to the existing arrays
             append!(X, Xnew[:])
             append!(mark, mark_new)
+            # update h
+            hfun = (r/R0)^meshparams[1]
+            h = max( (1.5*h), min(meshparams[1]*h, hfun) )
         end
     end
-
+    
     # create a triangulation
-    X = reshape(X, 2, length(X)/2)
+    X = reshape(X, 2, length(X) ÷ 2)
     tri = FEM.Triangulation(X)
     
     # create the reference domain
@@ -160,15 +164,38 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
             error("Domain : unknown `defect` parameter")
         end
     end
-
+    
     return geom
 end
 
 
-function draw(geom::Domain; Y=nothing, U=nothing)
-    
-    
-    
+"""
+visualise the domain and if passed deformation or displacement
+"""
+function compose(geom::Domain;
+                 Y=nothing, U=nothing,
+                 axis=:auto, lwidth=:auto)
+    if axis == :auto
+        axis = Plotting.autoaxis(geom.X)
+    end
+    if lwidth == :auto
+        lwidth = 0.3
+    end
+    # plot core atomistic nodes
+    ctx_atm = Plotting.compose_atoms(geom.X[:, find(geom.mark .== 0)];
+                                     axis=axis, fillcolor="tomato")
+    # plot buffer nodes
+    ctx_buf = Plotting.compose_atoms(geom.X[:, find(geom.mark .> 0)];
+                                     axis=axis,
+                                     fillcolor="aliceblue",
+                                     linecolor="darkblue" )
+    # ctx_cb = Plotting.compose_atoms(geom.X[:, find(geom.mark .< 0)];
+    #                                 axis=axis, fillcolor="aliceblue")
+    # plot the finite element mesh (should we remove the inner triangles)?
+    ctx_cb = Plotting.compose_elements(geom.tri.X, geom.tri.T;
+                                       axis=axis, lwidth=lwidth)
+    return Compose.compose( context(), ctx_atm, ctx_buf, ctx_cb )
 end
+
 
 
