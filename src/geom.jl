@@ -1,5 +1,9 @@
 
 using Compose
+using PyCall
+
+export nX, positions, dist, remove_atom!
+
 
 #
 # here we collect some functions that generate and manipulate
@@ -50,7 +54,6 @@ end
 "compute distance of points from some point"
 dist(X, X0) = sqrt(sumabs2(X .- X0, 1));
 dist(X) = sqrt(sumabs2(X, 1))
-export dist
 
 
 """
@@ -110,6 +113,8 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     mark = ones(Int8, nA)   
     mark[Ia_core] = 0
     
+    
+    
     # ============================
     # now the continuum component
     # ============================
@@ -144,24 +149,28 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
         end
     end
     
-    # create a triangulation
-    # TODO: CURRENTLY WE DO THIS TWICE!!!!! (again after introducing the defect)
+    # create a Triangulation object without actual triangulation
+    # the proper triangulation will be created after we add the defects
     X = reshape(X, 2, length(X) ÷ 2)
-    tri = FEM.Triangulation(X)
+    tri = FEM.Triangulation(X, Matrix{Int}(), PyObject(nothing))
     
     # create the reference domain
-    geom = Domain(X, Z, mark, AA, nA, tri, Dict())
-
+    geom = Domain(Z, mark, AA, nA, tri, Dict())
+    
     # construct some defects (if requested by the user)
     if A == nothing
         # note that we are currently assuming that the lattice is
         # the triangular lattice!
+        # remove_atom! and add_atom! both redo the triangulation
+        # so we don't need to create a new one!
         if defect == :vacancy
             I0 = find( dist(X) .< 0.1 )
             remove_atom!(geom, I0[1])
         elseif defect == :interstitial
             add_atom!(geom, [0.5;0.0])
-        elseif defect != :none
+        elseif defect == :none
+            geom.tri = FEM.Triangulation(X)
+        else
             error("Domain : unknown `defect` parameter")
         end
     end
@@ -171,8 +180,14 @@ end
 
 
 "number of nodes (not free nodes!)"
-nX(geom::Domain) = size(geom.X, 2)
-
+nX(geom::Domain) = size(geom.tri.X, 2)
+"reference to position array, same as `X`"
+positions(geom::Domain) = geom.tri.X
+"""domain dimension - currently this must always be 2; this function is
+included to ensure readability of some parts of the code. (and for the future
+allow an extension maybe?)
+"""
+ddim(geom::Domain) = 2
 
 
 "remove an atom from the geometry, usually to create a vacancy"
@@ -180,19 +195,19 @@ function remove_atom!(geom::Domain, idx)
     if geom.mark[idx] != 0
         error("remove_atom! : only allowed to remove core atoms")
     end
-    # TODO: if there are continuum nodes, then they are also included
-    # but not in Z!!!!
     Iall = setdiff(1:nX(geom), idx)
-    geom.X = geom.X[:, Iall]
+    X = positions(geom)[:, Iall]
     geom.mark = geom.mark[Iall]
-    Iat = setdiff(find(geom.mark .>= 0), idx)
+    # note, geom.Z is shorter than positions(geom) since continuum nodes are not included
+    Iat = setdiff(find(geom.mark .>= 0), idx) 
     geom.Z = geom.Z[:, Iat]
     geom.nA = geom.nA - 1
     # redo the triangulation
-    geom.tri = FEM.Triangulation(geom.X)
+    geom.tri = FEM.Triangulation(X)
+    return geom
 end
-export remove_atom!
 
+# TODO: add_atom!
 
 
 """
@@ -202,26 +217,25 @@ function compose(geom::Domain;
                  Y=nothing, U=nothing,
                  axis=:auto, lwidth=:auto)
     if axis == :auto
-        axis = Plotting.autoaxis(geom.X)
+        axis = Plotting.autoaxis(positions(geom))
     end
     if lwidth == :auto
         lwidth = 0.3
     end
     # plot core atomistic nodes
-    ctx_atm = Plotting.compose_atoms(geom.X[:, find(geom.mark .== 0)];
+    ctx_atm = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .== 0)];
                                      axis=axis, fillcolor="tomato")
     # plot buffer nodes
-    ctx_buf = Plotting.compose_atoms(geom.X[:, find(geom.mark .> 0)];
+    ctx_buf = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .> 0)];
                                      axis=axis,
                                      fillcolor="aliceblue",
                                      linecolor="darkblue" )
-    # ctx_cb = Plotting.compose_atoms(geom.X[:, find(geom.mark .< 0)];
+    # ctx_cb = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .< 0)];
     #                                 axis=axis, fillcolor="aliceblue")
     # plot the finite element mesh (should we remove the inner triangles)?
     ctx_cb = Plotting.compose_elements(geom.tri.X, geom.tri.T;
                                        axis=axis, lwidth=lwidth)
     return Compose.compose( context(), ctx_atm, ctx_buf, ctx_cb )
 end
-
 
 

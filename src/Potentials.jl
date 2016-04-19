@@ -5,7 +5,7 @@ export SitePotential
 export evaluate, grad
 export ToyEAMPotential
 export cutoff
-export rDim
+export rdim
 
 
 """
@@ -15,6 +15,12 @@ Derived types must implement
 * grad
 """
 abstract SitePotential
+
+"site potentials described by standard deformation"
+abstract StandardSitePotential <: SitePotential
+
+"site potentials for anti-plane displacements"
+abstract AntiplaneSitePotential <: SitePotential
 
 
 ########################## CUTOFF FUNCTION #################################
@@ -53,7 +59,7 @@ E_n = ∑_ρ ϕ(D_ρ) + F( ∑_ρ ψ(D_ρ) )
 ψ(r) = exp(- B (r-1))
 F(t) = 0.5 (t-psi0)^2 + C 0.25 (t-psi0)^4
 """
-type ToyEAMPotential <: SitePotential
+type ToyEAMPotential <: StandardSitePotential
     A
     B
     C
@@ -67,7 +73,7 @@ function ToyEAMPotential(; A=4.0, B=3.0, C=5.0, psi0=6*exp(- B*0.1), cutoff=(1.5
 end
 
 cutoff(pot::ToyEAMPotential) = pot.cutoff[2]
-rDim(pot::ToyEAMPotential) = 2
+rdim(pot::ToyEAMPotential) = 2
 
 morse(r, A) = exp(-2*A*(r-1)) - 2 * exp(-A*(r-1))
 morse1(r, A) = -2*A*(exp(-2*A*(r-1)) - exp(-A*(r-1)))
