@@ -56,6 +56,24 @@ dist(X, X0) = sqrt(sumabs2(X .- X0, 1));
 dist(X) = sqrt(sumabs2(X, 1))
 
 
+"return a lattice ball"
+function lattice_ball(;R=5.0, A=Atri)
+    # generate a cubic portion of Zd containing -R/sig : R/sig in each
+    # coordinate direction
+    sig = minimum(svd(A)[2])
+    ndim = ceil(Int, R/sig)
+    Z = twogrid_list(-ndim:ndim, -ndim:ndim)
+    # convert to physical reference configuration
+    X = A * Z
+    # keep only the points inside Ra+Rbuf
+    I = find(dist(X) .<= R)
+    X = X[:, I]
+    Z = Z[:, I]
+    return X, Z
+end
+
+
+
 """
 generates a set of points X (2 x N) containing precisely (A Zᵈ) ∩ B(R).
 
@@ -95,24 +113,13 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     else
         AA = A
     end
-    
-    # generate a cubic portion of Zd containing -R/sig : R/sig in each
-    # coordinate direction
-    sig = minimum(svd(AA)[2])
-    ndim = ceil(Int, (Ra+Rbuf)/sig)
-    Z = twogrid_list(-ndim:ndim, -ndim:ndim)
-    # convert to physical reference configuration
-    X = AA * Z
-    # keep only the points inside Ra+Rbuf
-    I = find(dist(X) .<= Ra+Rbuf)
-    X = X[:, I]
-    Z = Z[:, I]
+
+    X, Z = lattice_ball(A=AA, R=Ra + Rbuf)
     # collect some information
-    nA = length(I)    
+    nA = size(X, 2)
     Ia_core = find( dist(X) .<= Ra )
     mark = ones(Int8, nA)   
     mark[Ia_core] = 0
-    
     
     
     # ============================
@@ -210,6 +217,7 @@ end
 # TODO: add_atom!
 
 
+import Compose.compose
 """
 visualise the domain and if passed deformation or displacement
 """

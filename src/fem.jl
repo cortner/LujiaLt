@@ -150,6 +150,18 @@ find element indices to which the provided points belong.
 locate(P::Matrix{Float64}, tri::Triangulation) = tri.pyo[:find_simplex](P') + 1
 
 
+"""compute unique set of edges: for now this is an auxiliary function use
+for plotting, but it could become something more useful for 
+"""
+function edges(tri::Triangulation)
+    T = tri.T
+    S = [ T[1,:] T[1,:] T[2,:]; T[2,:] T[3,:] T[3,:] ]
+    S = sort(S, 1)
+    return unique(S, 2)
+end
+
+
+
 # ########################## PLOTTING ############################
 
 
@@ -200,13 +212,3 @@ end
 end # module FEM
 
 
-# """compute unique set of edges: for now this is an auxiliary function use
-# for plotting, but it could become something more useful for 
-# """
-# function _edges_(tri::Triangulation)
-#     T = tri.T
-#     S = [ T[1,:] T[1,:] T[2,:] T[2,:] T[3,:] T[3,:];
-#           T[2,:] T[3,:] T[1,:] T[3,:] T[1,:] T[2,:] ]
-#     S = sort(S, 1)
-#     return unique(S, 2)
-# end
