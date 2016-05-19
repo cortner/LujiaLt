@@ -36,7 +36,7 @@ function fdtest(F::Function, dF::Function, x)
         return true
     else
         warn("""is seems the finite-difference test has failed, wich indicates
-             that there is an inconsistency between the functiono and gradient 
+             that there is an inconsistency between the function and gradient
              evaluation""")
         return false
     end

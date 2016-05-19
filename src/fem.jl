@@ -133,9 +133,12 @@ compute some information related to P1-FEM:
         range dimension and `u` is the value of `u` at the element mid-point.
 """
 function P1element(el::Int, tri::Triangulation)
-    F = ref_grad(tri.T[:, el], tri.X)
-    return P1element( T[:, el], det(F) / 2, F,
-                      [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, el], 2) )
+  @assert el <= nT(tri)
+  @assert el <= size(tri.T, 2)
+  t = tri.T[:, el]
+    F = ref_grad(t, tri.X)
+    return P1element( tri.T[:, el], det(F) / 2, F,
+                      [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2) )
 end
 
 function P1element(el::Int, tri::Triangulation, U::Matrix{Float64})
@@ -176,7 +179,7 @@ end
 
 
 
-function triplot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
+function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
                 buffer=2*xradius, elcol = "aliceblue", linecol="darkblue",
                 lwidth=1.0, axis=:ignore)
 
@@ -226,52 +229,3 @@ end
 
 
 end # module FEM
-
-
-
-
-
-#
-# function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
-#               buffer=2*xradius, elcol = "aliceblue", linecol="darkblue",
-#               lwidth=1.0, axis=:ignore)
-#
-#     if axis == :ignore
-#         # create a canvas
-#         xLim = [extrema(tri.X[1,:])...]
-#         dat_width = xLim[2]-xLim[1]
-#         yLim = [extrema(tri.X[2,:])...]
-#         dat_height = yLim[2]-yLim[1]
-#         xLim[1] -= buffer; xLim[2] += buffer; dat_width = xLim[2]-xLim[1]
-#         yLim[1] -= buffer; yLim[2] += buffer; dat_height = yLim[2]-yLim[1]
-#
-#         if height == :auto
-#             height = width * (dat_height / dat_width)
-#         end
-#         ub = UnitBox(xLim[1], yLim[1], dat_width, dat_height)
-#     else
-#         ub = UnitBox(axis[1], axis[2], axis[3], axis[4])
-#     end
-#
-#     # draw the elements
-#     points = Tuple{Float64, Float64}[]
-#     for n = 1:nT(tri)
-#         p = [tri.X[:, tri.T[:, n]] tri.X[:, tri.T[1,n]]]
-#         for m = 1:size(p, 2)
-#             push!(points, tuple(p[1, m], p[2,m]))
-#         end
-#         push!(points, tuple(NaN, NaN))
-#     end
-#     c_ctx = compose(context(units=ub), polygon(points),
-#                     fill(elcol), stroke(linecol), linewidth(lwidth) )
-#
-#     # draw the nodes
-#     a_ctx = context(units=ub)
-#     if xradius > 0
-#         a_ctx = compose(a_ctx,
-#                         circle(tri.X[1,:], tri.X[2,:], [xradius]),
-#                         fill(atcol), stroke(linecol) )
-#     end
-#
-#     return compose(context(), a_ctx, c_ctx)
-# end

@@ -11,6 +11,10 @@ and a minimalistic electronic structure model (tight-binding).
 It is *not* designed for materials science applications,
 but purely for experimentation with new multi-scale algorithms.
 
+For serious molecular simulation see
+[Atoms.jl](https://github.com/libAtoms/Atoms.jl), but note that
+this is also still under heavy development.
+
 **Warning:** as of 19 May, this is under heavy development.
 
 ## Installation

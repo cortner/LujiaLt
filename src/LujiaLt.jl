@@ -71,7 +71,7 @@ of the energy.
 
 If the model has no associated energy, then `m(x)` should throw an error (since
 it expects the energy) while `@GRAD m(x)` should return the negative force
-vector.  
+vector.
 """
 abstract Model
 export Model
