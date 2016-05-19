@@ -1,13 +1,14 @@
 
 module MsUtils
 
-using Compose, Colors
+using Compose, Colors, PGFPlots
 
 export binsum, fdtest, plot_domain, compose_bonds, compose_atoms, plot_int
 export mat2tup, tup2mat
 export compose_strain, compose_displacement, plot_strain
 
-"""`binsum(p, i, maxi)` returns an array `s` of length `maxi` 
+"""
+`binsum(p, i, maxi)` returns an array `s` of length `maxi`
 such that s[n] = sum_{ i[m] == n } p[m]
 
 If the `maxi` argument is omitted, then `maxi = maximum(i)`.
@@ -56,7 +57,7 @@ function fdtest(U, energy_, grad_, hess_)
             ∇²E_h[:,n] = (grad_(U) - ∇E) / h
             U[n] -= h
         end
-        @printf(" %1.0e | %4.2e   %4.2e  \n", 
+        @printf(" %1.0e | %4.2e   %4.2e  \n",
                 h, norm(∇E - ∇E_h, Inf), vecnorm(∇²E - ∇²E_h, Inf))
     end
     return nothing
@@ -119,10 +120,10 @@ relative_height(ax, width) = (ax[4]-ax[3])/(ax[2]-ax[1]) * width
 auto_img(ImgT, ax, width) = ImgT(width, relative_height(ax, width))
 auto_img(ImgT, fname, ax, width) = ImgT(fname, width, relative_height(ax, width))
 
-function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6, 
+function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                   filename=nothing, printwidth = 10cm, plotwidth=15cm)
     # indices of defect atom and connected to defect
-    Id = [ size(X,2) ] # B[1][find(B[2] .== size(X,2))]; 
+    Id = [ size(X,2) ] # B[1][find(B[2] .== size(X,2))];
     B = tup2mat(B)
     # a shaded polygon
     r = 0.4; a = sqrt(3)/2
@@ -139,7 +140,7 @@ function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                    # defect region
                    ( context(axis), polygon(poly),
                      stroke("grey50"), fill("grey90") ) )
-    
+
     # draw the plot to a file
     if filename != nothing
         drawtofile(ctx, filename, axis, printwidth)
@@ -157,16 +158,16 @@ val2colfidx(x, cax) = max(0, min((x-cax[1]) / (cax[2]-cax[1]), 1))
 val2colidx(x, cmap, cax) = round(Int, 1 + (length(cmap)-1) * val2colfidx(x, cax))
 
 
-function compose_strain(X, B, ee; axis=autoaxis(X), lwidth=0.6, 
+function compose_strain(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                   cmap = colormap("RdBu")[end:-1:1], caxis = extrema(ee))
     ctx = context(axis)
     for n = 1:length(ee)
         p = MsUtils.mat2points(X[:, [B[1][n];B[2][n]]])
         col = val2col(ee[n], cmap, caxis)
-        ctx = compose(ctx, 
-                      ( context(axis), 
-                        line(p), 
-                        linewidth(lwidth), 
+        ctx = compose(ctx,
+                      ( context(axis),
+                        line(p),
+                        linewidth(lwidth),
                         stroke(col) )
                       )
     end
@@ -178,7 +179,7 @@ end
 #     compose_strains(m.X, m.B, ee; kwargs...)
 
 
-function compose_displacement(X, u; axis=autoaxis(X), lwidth=0.6, 
+function compose_displacement(X, u; axis=autoaxis(X), lwidth=0.6,
                               cmap = colormap("RdBu")[end:-1:1],
                               caxis = extrema(ee), radius = 0.15 )
     ctx = context(axis)
@@ -195,18 +196,18 @@ function compose_displacement(X, u; axis=autoaxis(X), lwidth=0.6,
 end
 
 
-function plot_strain(X, B, ee; axis=autoaxis(X), lwidth=0.6, 
+function plot_strain(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                      cmap = colormap("RdBu")[end:-1:1], caxis = extrema(ee),
                      filename=nothing, printwidth = 10cm, plotwidth=10cm,
                      radius=0.15)
-    
+
     ctx1 = compose_strain(X, B, ee, axis=axis, lwidth=lwidth,
                           cmap = cmap, caxis = caxis)
     nX = size(X,2)
     u = (1.0/6.0) * (binsum(ee, B[1], nX) + binsum(ee, B[2], nX))
     ctx2 = compose_displacement(X, u; axis=axis, lwidth=lwidth,
                                 cmap=cmap, caxis=caxis, radius=radius)
-    
+
     ctx = compose(context(axis), ctx2, ctx1)
     # draw the plot to a file or notebook
     if filename != nothing
@@ -215,12 +216,58 @@ function plot_strain(X, B, ee; axis=autoaxis(X), lwidth=0.6,
     if plotwidth != nothing
         draw(auto_img(SVG, axis, plotwidth), ctx)
     end
-    return ctx    
+    return ctx
 end
 
 
 
+"contruct a piecewise linear envelope of the data (x, y)"
+function envelope(x, y, xbin)
+    ybin = minimum(y) * ones(length(xbin))
+    for n = 1:length(y)
+        ybin[1] = max(ybin[1], y[n])
+        for m = 1:length(xbin)
+            if xbin[m] <= x[n]
+                ybin[m] = max(ybin[m], y[n])
+            end
+        end
+    end
+    return xbin, ybin
+end
+
+envelope(x, y, nbins::Number) =
+    envelope(x, y, linspace(extrema(x)..., nbins+1)[2:end])
+
+
+plot_slope(x1, x2, c, s; col="black") =
+    Plots.Linear([x1;x2], c*[x1;x2].^s, mark="none", style=col*", dotted, thick")
+
+
+# function plot_envelope(x, y, nbins; markSize=0.5,
+#                         slope = nothing,  label = nothing,
+#                         axis=[minimum(x); maximum(x); minimum(y); maximum(y)],
+#                         title = "")
+#     xbin, ybin = envelope(x, y, nbins)
+#     p = Axis([
+#             Plots.Scatter(x, y, markSize=markSize, style="blue");
+#             Plots.Linear(xbin, 1.15*ybin, mark="none", style="red, very thick")
+#         ],  title=title,
+#         ymode="log", xmode="log",
+#         xlabel=L"$r_b$", ylabel = L"$|Du_b|$",
+#         xmin=axis[1],ymin=axis[3],xmax=axis[2],ymax=axis[4]
+#         )
+#     if slope != nothing
+#         xs = slope[1:2]
+#         ys = slope[3] * slope[1:2].^slope[4]
+#         ps = Plots.Linear(xs, ys, mark="none", style="red, dotted, thick")
+#         push!(p, ps)
+#     end
+#     if label != nothing
+#         ps = Plots.Node(label[1], label[2], label[3])
+#         push!(p, ps)
+#     end
+#     return p
+# end
 
 
 end
-

@@ -1,6 +1,11 @@
 
 module Solve
 
+# TODO:
+#  * move everything to just using Optim.jl
+#  * implement CG solver from shewchuck; Matlab code copied below.
+
+
 
 # steepest descent with quadratic line-search
 function minimise(;obj=nothing, grad=nothing, x0=nothing,
@@ -77,12 +82,105 @@ end
 
 
 
-# CG or BFGS with Armijo + restart
+
+# # CG or BFGS with Armijo + restart
 
 
+# function ncg_force(; grad=nothing, x0=nothing, tol = 1e-4,
+                   
+#                    )
 
-# basic static iteration with force-based (non-)linesearch?
+# # basic static iteration with force-based (non-)linesearch?
 
+# function ncg_force(; grad=nothing, x0=nothing,
+#                    alpha0 = 1.0, tol = 1e-4, precon = 1.0,
+#                    maxnf = 1_000, Carmijo = 0.2,
+#                    displevel = 2, alpha_min = 1e-8,
+#                    σ0 = 0.1)
 
+#     # allocate some stuff
+#     N = length(x0)
+#     u = x0             # current state
+#     u_aux = copy(x0)
+    
+#     # Evaluate first force and search direction
+#     F = grad(u)
+#     p = F
 
+#     # some initialisation
+#     δ_new = dot(F, p)
+#     δ0 = δ_new
+#     nf = 0
+#     res_inf = norm(F, Inf)
+    
+#     while nf < maxnf && res_inf > tol
+#         # I have no idea what all this is ?!?!?
+#         sec_iter = 0
+#         δ = dot(p, p)    #delta_D = δ
+#         α = - σ0
+#         u_aux = u + σ0 * p
+#         F_new = grad(u_aux)
+#         η_prev = dot(F_new, p);
+#         η = dot(-F, p);
+#         α *= η / (η_prev - η)
+#         u += α * p
+#         η_prev = η
+#         sec_iter += 1
+#         #  Perform secant iteration loop
+#         while sec_iter < max_sec_iter && α^2 * δ > tol^2
+#             F = grad(u)
+#             η = dot(F, p)
+#             α *= η / (η_prev - η)
+#             u += α * p
+#             η_prev = η
+#             sec_iter += 1
+#         end
+        
+        
+        
+#     end
+    
 end
+
+    
+    
+    
+# #     force = -bqcf(u);
+    
+# #     delta_OLD = delta_NEW;
+# #     delta_MID = dot(force,sForce);
+    
+# #     %In this step would compute a preconditioner
+# #     sForce = force;  %would be sForce = M^(-1)force
+
+# #     delta_NEW = dot(force,sForce);
+# #     beta = (delta_NEW-delta_MID)/delta_OLD;
+# # %     disp('Here!!!!!');
+# # %     pause;
+# # %     disp('Delta_NEW');
+# # %     disp(delta_NEW);
+# # %     disp('beta');
+# # %     disp(beta);
+# # %     pause;
+# #     if beta <= 0
+# #         direction = sForce;
+# #     else
+# #         direction = sForce + beta*direction;
+# #     end
+# #     iter = iter+1;
+# #     fprintf('frc : %4.2e,  \n', delta_NEW);
+# #     fprintf('delta_D : %4.2e,  \n', delta_D);
+# #     fprintf('delta_MID : %4.2e,  \n', delta_MID);
+# #     fprintf('delta_OLD : %4.2e,  \n', delta_OLD);
+# #     fprintf([' sec_iter = ', num2str(sec_iter)]);
+# #     fprintf(' beta = %4.2e,  ', beta);
+# #     fprintf(' alpha = %4.2e,  ', alpha);
+# #     disp(['|U|_inf = ', num2str(norm(u(:), Inf))]);
+    
+# # end
+
+# # disp(iter);
+# # disp(delta_NEW);
+# # pause;
+
+# # end

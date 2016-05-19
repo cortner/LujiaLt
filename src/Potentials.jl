@@ -4,7 +4,7 @@ module Potentials
 export SitePotential
 export evaluate, grad
 export ToyEAMPotential
-export cutoff
+# export fcut, fcut1, swcut, swcut1
 export rdim
 
 
@@ -49,6 +49,25 @@ function fcut1(r, cutoff)
     return ( - (30*s.^4 - 60 * s.^3 + 30 * s.^2) / (cutoff[2]-cutoff[1])
              .* (0 .< s .< 1) )
 end
+
+
+"""SW-type cutoff function  `function cutoff(r, Rc, lc)`
+
+## Input:
+*    r  : variable
+*    Rc : cutoff radius
+*    lc : cutoff weight
+"""
+swcut(r::Float64, Rc, lc) =
+    (r >= Rc-0.01) ? 0.0 : 1.0 / ( 1.0 + exp( lc / (Rc-r) ) )
+swcut(r::Array{Float64}, Rc, lc) =
+    Float64[ swcut(r[i], Rc, lc) for i in eachindex(r) ]
+"first derivative of `swcut`"
+swcut1(r, Rc, lc) =
+    ( (r >= Rc-0.01) ? 0.0 :
+      -1.0 / (1.0 + exp(lc/(Rc-r)))^2 * exp(lc/(Rc-r)) * (lc / (Rc-r)^2) )
+swcut1(r::Array{Float64}, Rc, lc) =
+    Float64[ swcut1(r[i], Rc, lc) for i in eachindex(r) ]
 
 
 ########################## TOY EAM MODEL #################################
