@@ -39,7 +39,7 @@ const Atri=[1.0 cos(pi/3); 0.0 sin(pi/3)]
 # usual trick to allow more parameters to be stored
 Base.getindex(geom::Domain, idx) = geom.info[idx]
 Base.setindex!(geom::Domain, val, idx) = (geom.info[idx] = val)
-   
+
 "auxiliary function ala meshgrid"
 twogrid{T}(x::Vector{T}, y::Vector{T}) =
     (x .+ ones(T, length(y))', ones(T, length(x)) .+ y')
@@ -57,16 +57,16 @@ dist(X) = sqrt(sumabs2(X, 1))
 
 
 "return a lattice ball"
-function lattice_ball(;R=5.0, A=Atri)
+function lattice_ball(;R=5.0, A=Atri, x0=[0.0;0.0])
     # generate a cubic portion of Zd containing -R/sig : R/sig in each
     # coordinate direction
     sig = minimum(svd(A)[2])
-    ndim = ceil(Int, R/sig)
+    ndim = ceil(Int, (norm(x0)+R)/sig)
     Z = twogrid_list(-ndim:ndim, -ndim:ndim)
     # convert to physical reference configuration
     X = A * Z
     # keep only the points inside Ra+Rbuf
-    I = find(dist(X) .<= R)
+    I = find(dist(X, x0) .<= R)
     X = X[:, I]
     Z = Z[:, I]
     return X, Z
@@ -89,7 +89,7 @@ ignored.
 * `shape` : {:ball} this is the only shape allowed at the moment
 * `lattice` : {:triangular}; this is the only admissible choice right now
 * `defect` : {:none}; admissible choices are `:vacancy`, `:interstitial`
-* `meshparams` : {[1.5; 3.0]}, 1.5 is the idea coarsening rate, 2.0 is the 
+* `meshparams` : {[1.5; 3.0]}, 1.5 is the idea coarsening rate, 2.0 is the
     maximum factor by which neighbouring layers of elements may increase
 
 ## Output
@@ -102,7 +102,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     if shape != :ball
         error("Domain: `shape` parameter allows only `:ball` at present")
     end
-    
+
     # get the lattice matrix
     if A == nothing
         if lattice == :triangular
@@ -118,10 +118,10 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
     # collect some information
     nA = size(X, 2)
     Ia_core = find( dist(X) .<= Ra )
-    mark = ones(Int8, nA)   
+    mark = ones(Int8, nA)
     mark[Ia_core] = 0
-    
-    
+
+
     # ============================
     # now the continuum component
     # ============================
@@ -155,15 +155,15 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
             h = max( (1.5*h), min(meshparams[1]*h, hfun) )
         end
     end
-    
+
     # create a Triangulation object without actual triangulation
     # the proper triangulation will be created after we add the defects
     X = reshape(X, 2, length(X) ÷ 2)
     tri = FEM.Triangulation(X, Matrix{Int}(), PyObject(nothing))
-    
+
     # create the reference domain
     geom = Domain(Z, mark, AA, nA, tri, Dict())
-    
+
     # construct some defects (if requested by the user)
     if A == nothing
         # note that we are currently assuming that the lattice is
@@ -181,7 +181,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
             error("Domain : unknown `defect` parameter")
         end
     end
-    
+
     return geom
 end
 
@@ -206,7 +206,7 @@ function remove_atom!(geom::Domain, idx)
     X = positions(geom)[:, Iall]
     geom.mark = geom.mark[Iall]
     # note, geom.Z is shorter than positions(geom) since continuum nodes are not included
-    Iat = setdiff(find(geom.mark .>= 0), idx) 
+    Iat = setdiff(find(geom.mark .>= 0), idx)
     geom.Z = geom.Z[:, Iat]
     geom.nA = geom.nA - 1
     # redo the triangulation
@@ -245,5 +245,3 @@ function compose(geom::Domain;
                                        axis=axis, lwidth=lwidth)
     return Compose.compose( context(), ctx_atm, ctx_buf, ctx_cb )
 end
-
-
