@@ -34,6 +34,28 @@ include("solve.jl")
 
 *  X[:, 1:nA] = A * Z are the atomistic nodes; in particular note that FEM nodes
     don't have a corresponding Z entry
+
+## Constructor `Domain(kwargs...)`
+
+generates a set of points X (2 x N) containing precisely (A Zᵈ) ∩ B(R).
+
+## Parameters
+
+All parameters are keyword. When `A != nothing` then `lattice` and `defect` are
+ignored.
+
+* `A` : lattice matrix
+* `Ra` : {5.0} atomistic region radius; must be > 0
+* `Rc` : {0.0} continuum region radius, if < Ra, then there is no continuum region
+* `Rbuf` : {0.0} atomistic layer added to the atomistic core region B(Ra) >> B(Ra+Rbuf)
+* `shape` : {:ball} this is the only shape allowed at the moment
+* `lattice` : {:triangular}; this is the only admissible choice right now
+* `defect` : {:none}; admissible choices are `:vacancy`, `:interstitial`
+* `meshparams` : {[1.5; 3.0]}, 1.5 is the idea coarsening rate, 2.0 is the
+    maximum factor by which neighbouring layers of elements may increase
+
+## Output
+
 """
 type Domain
     # X::Matrix{Float64}

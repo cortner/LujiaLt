@@ -104,6 +104,11 @@ function drawtofile(ctx, filename, ax, width)
     draw(img, ctx)
 end
 
+compose_atoms(X) = compose_atoms(X, [0.2;], 0.0, autoaxis(X), red)
+
+draw_atoms(X) = draw(auto_img(SVG, autoaxis(X), 15cm),
+                     compose(context(), compose_atoms(X)) )
+
 compose_atoms(X, radii, lwidth, axis, col) =
     ( context(axis), circle(X[1,:][:], X[2,:][:], radii),
       stroke(col), linewidth(lwidth), fill(col) )

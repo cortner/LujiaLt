@@ -73,31 +73,51 @@ function lattice_ball(;R=5.0, A=Atri, x0=[0.0;0.0])
 end
 
 
+"construct FEM nodes on an annulus"
+function radial_nodes(Rin, Rout;
+                     hin = 1.0, hgrowth=1.5, growthbound=3.0, x0=[0.0;0.0])
+   # arrays to be returned
+   X = Float64[]    # positions of nodes
+   mark = Int[]     # markers (layers)
 
-"""
-generates a set of points X (2 x N) containing precisely (A Zᵈ) ∩ B(R).
+   # create an array of radii and mesh sizes that we can adjust to the
+   # requires Rc, before doing the actual assembly
+   #####   <<<<<<<<  TODO
+   #####
 
-## Parameters
+   # initialise
+   r = Rin-hin
+   h = hin
+   layer = 0
+   # loop over layers
+   while r < Rout
+      r += h
+      layer -= 1
+      # the current ring has diameter 2 π r
+      diam = 2 * π * r;
+      # number of edges along this circle is ceil(diam / h)
+      Nedges = ceil(diam/h)
+      # create the new coordinates
+      θ = collect(linspace(0, 2*π - 2*π/Nedges, Nedges))
+      Xnew = [x0[1] + r * cos(θ)'; x0[2] + r * sin(θ)']
+      mark_new = layer * ones(Int8, length(θ))
+      # append to the existing arrays
+      append!(X, Xnew[:])
+      append!(mark, mark_new)
+      # update h
+      hfun = (r/Rin)^hgrowth
+      h = max( (1.5*h), min(growthbound*h, hfun) )
+   end
 
-All parameters are keyword. When `A != nothing` then `lattice` and `defect` are
-ignored.
+   return reshape(X, 2, length(X) ÷ 2), mark
+end
 
-* `A` : lattice matrix
-* `Ra` : {5.0} atomistic region radius; must be > 0
-* `Rc` : {0.0} continuum region radius, if < Ra, then there is no continuum region
-* `Rbuf` : {0.0} atomistic layer added to the atomistic core region B(Ra) >> B(Ra+Rbuf)
-* `shape` : {:ball} this is the only shape allowed at the moment
-* `lattice` : {:triangular}; this is the only admissible choice right now
-* `defect` : {:none}; admissible choices are `:vacancy`, `:interstitial`
-* `meshparams` : {[1.5; 3.0]}, 1.5 is the idea coarsening rate, 2.0 is the
-    maximum factor by which neighbouring layers of elements may increase
 
-## Output
 
-"""
+
 function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
                 lattice=:triangular, defect=:none, shape=:ball,
-                meshparams = [1.5; 3.0] )
+                meshparams = [1.5; 3.0], x0 = :auto )
 
     if shape != :ball
         error("Domain: `shape` parameter allows only `:ball` at present")
@@ -114,47 +134,36 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
         AA = A
     end
 
-    X, Z = lattice_ball(A=AA, R=Ra + Rbuf)
+    # default defect core position
+    if x0 == :auto
+      x0 = [0.0; 0.0]
+      if defect == :screw
+         x0 = [0.5; sqrt(3)/4]
+      end
+      if defect == :interstitial
+         x0 = [0.5; 0.0]
+      end
+   end
+
+    X, Z = lattice_ball(A=AA, R=Ra + Rbuf, x0=x0)
     # collect some information
     nA = size(X, 2)
-    Ia_core = find( dist(X) .<= Ra )
+    Ia_core = find( dist(X, x0) .<= Ra )
     mark = ones(Int8, nA)
     mark[Ia_core] = 0
 
-
-    # ============================
-    # now the continuum component
-    # ============================
-    if Rc > Ra+Rbuf
-        R0 = Ra+Rbuf                           # initial radius
-        H0 = minimum( setdiff(dist(X), 0.0) )  # initial mesh-size
-        # create an array of radii and mesh sizes that we can adjust to the
-        # requires Rc, before doing the actual assembly
-        #####   <<<<<<<<  TODO
-        #####
-        h = H0
-        r = R0-0.4*h
-        layer = 0
-        X = X[:]      # temporarily linearise the X array
-        while r < Rc
-            r += h
-            layer -= 1
-            # the current ring has diameter 2 π r
-            diam = 2 * π * r;
-            # number of edges along this circle is ceil(diam / h)
-            Nedges = ceil(diam/h)
-            # create the new coordinates
-            θ = collect(linspace(0, 2*π - 2*π/Nedges, Nedges))
-            Xnew = [r * cos(θ)'; r * sin(θ)']
-            mark_new = layer * ones(Int8, length(θ))
-            # append to the existing arrays
-            append!(X, Xnew[:])
-            append!(mark, mark_new)
-            # update h
-            hfun = (r/R0)^meshparams[1]
-            h = max( (1.5*h), min(meshparams[1]*h, hfun) )
-        end
-    end
+   #  ============================
+   #  now the continuum component
+   #  ============================
+   if Rc > Ra+Rbuf
+      R0 = Ra+Rbuf                           # initial radius
+      # H0 = minimum( setdiff(dist(X), 0.0) )  # initial mesh-size
+      X_c, mark_c = radial_nodes(R0 + 0.6*H0, Rc,
+                     hgrowth=meshparams[1], growthbound=meshparams[2])
+      # add to existing array
+      X = [X X_c]
+      mark = [mark; mark_c]
+   end
 
     # create a Triangulation object without actual triangulation
     # the proper triangulation will be created after we add the defects
@@ -205,7 +214,8 @@ function remove_atom!(geom::Domain, idx)
     Iall = setdiff(1:nX(geom), idx)
     X = positions(geom)[:, Iall]
     geom.mark = geom.mark[Iall]
-    # note, geom.Z is shorter than positions(geom) since continuum nodes are not included
+    # note, geom.Z is shorter than positions(geom) since continuum nodes are
+    # not included
     Iat = setdiff(find(geom.mark .>= 0), idx)
     geom.Z = geom.Z[:, Iat]
     geom.nA = geom.nA - 1

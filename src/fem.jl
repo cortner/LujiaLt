@@ -71,6 +71,8 @@ array `X`, where Npoints must be larger than 2, and simply call
 
 ## Usage via iterator
 
+TODO: update documentation here!
+
 ```
   # assume X are the FE nodes and U the nodal values
   tri = Triangulation(X)
@@ -133,11 +135,9 @@ compute some information related to P1-FEM:
         range dimension and `u` is the value of `u` at the element mid-point.
 """
 function P1element(el::Int, tri::Triangulation)
-  @assert el <= nT(tri)
-  @assert el <= size(tri.T, 2)
-  t = tri.T[:, el]
-    F = ref_grad(t, tri.X)
-    return P1element( tri.T[:, el], det(F) / 2, F,
+   t = tri.T[:, el]
+   F = ref_grad(t, tri.X)
+   return P1element( tri.T[:, el], det(F) / 2, F,
                       [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2) )
 end
 
