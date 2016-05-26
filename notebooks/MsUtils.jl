@@ -2,6 +2,8 @@
 module MsUtils
 
 using Compose, Colors, PGFPlots
+import LujiaLt
+FEM = LujiaLt.FEM
 
 export binsum, fdtest, plot_domain, compose_bonds, compose_atoms, plot_int
 export mat2tup, tup2mat
@@ -91,6 +93,7 @@ colfromname(name) = RGB( ([Colors.color_names[name]...]/255)... )
 const red = colfromname("tomato")
 const blue = colfromname("darkblue")
 const alice = colfromname("aliceblue")
+const green = colfromname("darkgreen")
 
 edges2path(X, E) = insert_nans( [X[:, E[1,:][:]]; X[:, E[2,:][:]]] )
 insert_nans(P) = reshape( [P; NaN * ones(2, size(P, 2))], 2, 3 * size(P, 2) )
@@ -125,14 +128,19 @@ relative_height(ax, width) = (ax[4]-ax[3])/(ax[2]-ax[1]) * width
 auto_img(ImgT, ax, width) = ImgT(width, relative_height(ax, width))
 auto_img(ImgT, fname, ax, width) = ImgT(fname, width, relative_height(ax, width))
 
+
+function compose_defint(axis)
+   # a shaded polygon
+   r = 0.4; a = sqrt(3)/2
+   poly = [ (-r, 0.0); (0.5, -a-r); (1.0+r, 0.0); (0.5, a+r) ]
+   return ( context(axis), polygon(poly), stroke("grey50"), fill("grey90") )
+end
+
 function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                   filename=nothing, printwidth = 10cm, plotwidth=15cm)
     # indices of defect atom and connected to defect
     Id = [ size(X,2) ] # B[1][find(B[2] .== size(X,2))];
     B = tup2mat(B)
-    # a shaded polygon
-    r = 0.4; a = sqrt(3)/2
-    poly = [ (-r, 0.0); (0.5, -a-r); (1.0+r, 0.0); (0.5, a+r) ]
     ctx = compose( context(axis),
                    # defect atoms
                    compose_atoms(X[:,Id], [0.15], 0.5, axis, red),
@@ -143,8 +151,7 @@ function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                    # defect bonds
                    compose_bonds(X, B[:, find(ee .> 1e-10)], lwidth, red, axis),
                    # defect region
-                   ( context(axis), polygon(poly),
-                     stroke("grey50"), fill("grey90") ) )
+                   compose_defint(axis) )
 
     # draw the plot to a file
     if filename != nothing
@@ -248,6 +255,53 @@ plot_slope(x1, x2, c, s; col="black") =
     Plots.Linear([x1;x2], c*[x1;x2].^s, mark="none", style=col*", dotted, thick")
 
 
+
+function plot_acgeom(ac; axis=autoaxis(ac.X), lwidth=0.6,
+                     filename=nothing, printwidth = 10cm, plotwidth=15cm)
+
+   # node indices
+   Ii = union(ac.Bi[1], ac.Bi[2])
+   Ia = setdiff(union(ac.Bat[1], ac.Bat[2]), Ii)
+   Ic = setdiff(collect(1:size(ac.X,2)), union(Ii, Ia))
+
+   Xghost, _ = LujiaLt.lattice_ball( R = maximum(2*sqrt(sumabs2(ac.X,1))) )
+
+   ctx = compose( context(axis),
+                  # atomistic nodes
+                  compose_atoms(ac.X[:,Ia], [0.15], 0.0, axis, red),
+                  # interface nodes
+                  compose_atoms(ac.X[:,Ii], [0.15], 0.0, axis, green),
+                  # ghost atoms
+                  compose_atoms(Xghost, [0.07], 0.0, axis, "grey60"),
+                  # atomistic bonds
+                  compose_bonds(ac.X, ac.Bat, lwidth, red, axis),
+                  # interface bonds
+                  compose_bonds(ac.X, ac.Bi, lwidth, green, axis),
+                  # elements
+                  FEM.compose_elements(ac.tri, alice, blue, lwidth, _ub_(axis)),
+                  # and lastly a little shade under the defect
+                  compose_defint(axis)
+                )
+
+   # draw the plot to a file
+   if filename != nothing
+      drawtofile(ctx, filename, axis, printwidth)
+   end
+   if plotwidth != nothing
+      draw(auto_img(SVG, axis, plotwidth), ctx)
+   end
+   return ctx
+end
+
+
+end
+
+
+
+
+
+
+
 # function plot_envelope(x, y, nbins; markSize=0.5,
 #                         slope = nothing,  label = nothing,
 #                         axis=[minimum(x); maximum(x); minimum(y); maximum(y)],
@@ -273,6 +327,3 @@ plot_slope(x1, x2, c, s; col="black") =
 #     end
 #     return p
 # end
-
-
-end

@@ -178,6 +178,20 @@ end
 # ########################## PLOTTING ############################
 
 
+function compose_elements(tri, elcol, linecol, lwidth, ub)
+   # draw the elements
+   points = Tuple{Float64, Float64}[]
+   for n = 1:nT(tri)
+      p = [tri.X[:, tri.T[:, n]] tri.X[:, tri.T[1,n]]]
+      for m = 1:size(p, 2)
+           push!(points, tuple(p[1, m], p[2,m]))
+      end
+      push!(points, tuple(NaN, NaN))
+   end
+   return compose(context(units=ub), polygon(points),
+                   fill(elcol), stroke(linecol), linewidth(lwidth) )
+end
+
 
 function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
                 buffer=2*xradius, elcol = "aliceblue", linecol="darkblue",
@@ -200,17 +214,7 @@ function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
         ub = UnitBox(axis[1], axis[2], axis[3], axis[4])
     end
 
-    # draw the elements
-    points = Tuple{Float64, Float64}[]
-    for n = 1:nT(tri)
-        p = [tri.X[:, tri.T[:, n]] tri.X[:, tri.T[1,n]]]
-        for m = 1:size(p, 2)
-            push!(points, tuple(p[1, m], p[2,m]))
-        end
-        push!(points, tuple(NaN, NaN))
-    end
-    c_ctx = compose(context(units=ub), polygon(points),
-                    fill(elcol), stroke(linecol), linewidth(lwidth) )
+    c_ctx = compose_elements(tri, elcol, linecol, lwidth, ub)
 
     # draw the nodes
     a_ctx = context(units=ub)

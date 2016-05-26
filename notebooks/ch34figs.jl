@@ -80,3 +80,8 @@ p = Axis([
         legendPos="south west" )
 # display(p)
 save("ex-decay-all.pdf", p)
+
+
+# plotting the A/C geometry
+ac = AcModel(Ra=3.2, Rc=7, defect=Interstitial)
+MsUtils.plot_acgeom(ac; filename="acgeom.pdf", printwidth=12cm, plotwidth=nothing);
