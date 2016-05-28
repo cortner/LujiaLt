@@ -115,12 +115,19 @@ nT(tri::Triangulation) = size(tri.T, 2)
 "returns number of nodes in the triangulation"
 nX(tri::Triangulation) = size(tri.X, 2)
 
-
 "creates an iterator over elements"
 elements(tri::Triangulation) = tri
 Base.start(::Triangulation) = 0
 Base.done(tri::Triangulation, state::Int) = (state == nT(tri))
 Base.next(tri::Triangulation, state::Int) = ( P1element(state+1, tri), state+1 )
+
+# TODO: consider reviving this!
+# TriU = Tuple{Triangulation, Vector}
+# elements(tri::Triangulation, U) = (tri, U)
+# Base.start(::TriU) = 0
+# Base.done(triU::TriU, state::Int) = (state == nT(triU[1]))
+# Base.next(triU::TriU, state::Int) = ( P1element(state+1, triU...), state+1 )
+
 
 "compute the P1 gradient in the reference triangle"
 ref_grad(t::Vector{Int}, V::Matrix{Float64}) = V[:, t[2:3]] .- V[:, t[1]]
@@ -141,14 +148,11 @@ function P1element(el::Int, tri::Triangulation)
                       [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2) )
 end
 
-function P1element(el::Int, tri::Triangulation, U::Matrix{Float64})
-    vol, F = P1_element(el, tri)
-    DU_ref = ref_grad(tri.T[:, el], U)
-    invF = [F[2,2] -F[1,2]; -F[2,1] F[1,1]] * 2 / vol
-    return vol, F, DU_ref * invF
-end
-
-P1element( eltri::Tuple, varargs...) = P1_element(eltri..., varargs...)
+# function P1element(idx::Int, tri::Triangulation, U::Matrix{Float64})
+#    el = P1element(idx, tri)
+#    return el, el.B' * U[el.t]
+# end
+# P1element( eltri::Tuple, varargs...) = P1_element(eltri..., varargs...)
 
 
 """

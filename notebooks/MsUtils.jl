@@ -213,6 +213,9 @@ function plot_strain(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                      filename=nothing, printwidth = 10cm, plotwidth=10cm,
                      radius=0.15)
 
+      X = copy(X)
+      X[2,:] = - X[2,:]
+
     ctx1 = compose_strain(X, B, ee, axis=axis, lwidth=lwidth,
                           cmap = cmap, caxis = caxis)
     nX = size(X,2)
