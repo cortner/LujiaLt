@@ -163,6 +163,32 @@ function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6,
     return ctx
 end
 
+_reflect_(x::Array) = [1 0; 0 -1] * x
+
+function plot_screw(X, B, ee; axis=autoaxis(X), lwidth=0.6,
+                  filename=nothing, printwidth = 10cm, plotwidth=15cm,
+                  ξ = [0.5;sqrt(3)/6] )
+   X = _reflect_(X); ξ = _reflect_(ξ)
+   B = tup2mat(B)
+   ctx = compose( context(axis),
+               # place holder for the defect core.
+               compose_atoms(reshape(ξ, 2,1), [0.15], 0.5, axis, red),
+               # homogeneous lattice atoms
+               compose_atoms(X, [0.15], 0.5, axis, blue),
+               # normal bonds
+               compose_bonds(X, B, lwidth, blue, axis)
+            )
+
+    # draw the plot to a file
+    if filename != nothing
+        drawtofile(ctx, filename, axis, printwidth)
+    end
+    if plotwidth != nothing
+        draw(auto_img(SVG, axis, plotwidth), ctx)
+    end
+    return ctx
+end
+
 
 "compute a color from a value, a color-axis and a color-map"
 val2col(x, cmap, cax) = cmap[val2colidx(x, cmap, cax)]

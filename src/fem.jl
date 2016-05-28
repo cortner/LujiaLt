@@ -167,7 +167,8 @@ locate(P::Matrix{Float64}, tri::Triangulation) = tri.pyo[:find_simplex](P') + 1
 
 """
 compute unique set of edges: for now this is an auxiliary function used
-for plotting, but it could become something more useful for
+for plotting, but it could become something more useful for other
+purposes as well
 """
 function edges(tri::Triangulation)
     T = tri.T
