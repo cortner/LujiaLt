@@ -1,6 +1,8 @@
 # plotting scripts for the book
 
 
+# ===========================================================================
+
 
 # homogeneous triangular lattice
 X = domain(10.0, NoDefect)
@@ -13,6 +15,7 @@ draw(MsUtils.auto_img(PDF, "ex-trilattice.pdf", axis, 10cm), ctx)
 draw(MsUtils.auto_img(SVG, axis, 10cm), ctx)
 
 
+# ===========================================================================
 
 # point defect in infinite medium
 X = domain(10.0, Interstitial)
@@ -21,6 +24,8 @@ ee = prestrain(X, B, Interstitial)
 ctx = plot_int( X, B, ee, axis=[-ξi[1]-4.0; ξi[1]+5.0; ξi[2]-3; ξi[2]+3],
 filename="ex_int_atm.pdf", printwidth=10cm, plotwidth=10cm );
 
+
+# ===========================================================================
 
 # interstitial strain field
 m = AtmModel(R = 20, defect=Interstitial)
@@ -41,6 +46,8 @@ MsUtils.plot_strain(m.X, m.B, log(abs(m.e+Du)+3e-2);
                    filename = "apx-strain-screw.pdf", printwidth=12cm);
 u_tot = predictor(m.X, Screw) + u
 MsUtils.plot_displacement(m.X, m.B, u_tot);
+
+# ===========================================================================
 
 # ENVELOPES of strain fields
 R = 50    # computational domain radius
@@ -85,3 +92,43 @@ save("ex-decay-all.pdf", p)
 # plotting the A/C geometry
 ac = AcModel(Ra=3.2, Rc=7, defect=Interstitial)
 MsUtils.plot_acgeom(ac; filename="acgeom.pdf", printwidth=12cm, plotwidth=nothing);
+
+
+
+
+# ===========================================================================
+# strain path integrals
+
+m = AtmModel(R = 20, defect=Screw)
+Atri = [[1.0;0.0] [0.5; sqrt(3)/2]]
+path1 = Atri * [ [-1;-1] [0;-1] [1;-1] [2;-1] [3;-1] [2;0] [1;1] [0;2] [-1;3] [-1;2] [-1;1] [-1;0] [-1;-1] ]
+path2 = Atri * [ [5;-1] [6;-1] [7;-1] [8;-1] [8;0] [7;1]  [6;2]  [5;3]  [4;3] [4;2]  [4;1]  [4;0]  [5;-1] ]
+
+function strain_path(path)
+    Ipath = MsUtils.find_index(m.X, path)
+    u = predictor([-m.X[1,:]; m.X[2,:]], Screw) + solve(m)
+    upath = u[Ipath]
+    α = grad2strain(diff(upath))
+    Iα = [upath[1]; upath[1] + cumsum(α)] + 0.05
+    return upath, Iα
+end
+
+Idu1, Iα1 = strain_path(path1)
+Idu2, Iα2 = strain_path(path2)
+xx = 1:length(Idu1)
+
+p = Axis([
+    Plots.Linear(xx, Idu1, legendentry=L"$\sum_{b \in p} Du_b$",
+                style="thick, black, dashed, mark=o, mark options={solid, black}");
+    Plots.Linear(xx, Iα1, legendentry=L"$\sum_{b \in p} \alpha_b$",
+                style="thick, black, mark=*, mark options={solid, black, fill=black}");
+    Plots.Linear(xx, Idu2, legendentry=L"$\sum_{b \in p'} Du_b$",
+                style="thick, red!70!black, dashed, mark=square, mark options={solid}");
+    Plots.Linear(xx, Iα2, legendentry=L"$\sum_{b \in p'} \alpha_b$",
+                 style="thick, red!70!black, solid, mark=square*, mark options={fill=red!70!black}" )
+        ],
+        xlabel="",
+        ylabel = "",
+        legendPos="south west" )
+display(p)
+save("bvec_cumsum.svg", p)

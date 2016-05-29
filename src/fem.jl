@@ -94,6 +94,7 @@ type P1element
   J
   B
   xT
+  idx
 end
 
 function Triangulation(X)
@@ -141,11 +142,11 @@ compute some information related to P1-FEM:
         represented by `U` which is given as a `r x nX` array with `r` being the
         range dimension and `u` is the value of `u` at the element mid-point.
 """
-function P1element(el::Int, tri::Triangulation)
-   t = tri.T[:, el]
+function P1element(idx::Int, tri::Triangulation)
+   t = tri.T[:, idx]
    F = ref_grad(t, tri.X)
-   return P1element( tri.T[:, el], det(F) / 2, F,
-                      [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2) )
+   return P1element( tri.T[:, idx], det(F) / 2, F,
+                      [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2), idx )
 end
 
 # function P1element(idx::Int, tri::Triangulation, U::Matrix{Float64})
@@ -153,6 +154,17 @@ end
 #    return el, el.B' * U[el.t]
 # end
 # P1element( eltri::Tuple, varargs...) = P1_element(eltri..., varargs...)
+
+"""
+return the convex coordinates of a point `y` relative to a triangle
+with index `i`
+"""
+function convex_coordinates(y::Vector, i::Integer, tri::Triangulation)
+   # y = x0 + F * [l1;l2]
+   F = ref_grad(tri.T[:, i], tri.X)
+   lam = F \ (y - tri.X[:, tri.T[1,i]])
+   return [1 - lam[1] - lam[2]; lam[1]; lam[2]]
+end
 
 
 """

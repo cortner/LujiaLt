@@ -323,36 +323,14 @@ function plot_acgeom(ac; axis=autoaxis(ac.X), lwidth=0.6,
 end
 
 
+find_index(X, x::Vector) = find(sumabs2(X.-x, 1) .<= 1e-10)[1]
+find_index(X, x::Matrix) = [ find_index(X, x[:,i]) for i = 1:size(x,2) ]
+
+
+
+# ===========================================================================
+#    Error analysis
+# ===========================================================================
+
+
 end
-
-
-
-
-
-
-
-# function plot_envelope(x, y, nbins; markSize=0.5,
-#                         slope = nothing,  label = nothing,
-#                         axis=[minimum(x); maximum(x); minimum(y); maximum(y)],
-#                         title = "")
-#     xbin, ybin = envelope(x, y, nbins)
-#     p = Axis([
-#             Plots.Scatter(x, y, markSize=markSize, style="blue");
-#             Plots.Linear(xbin, 1.15*ybin, mark="none", style="red, very thick")
-#         ],  title=title,
-#         ymode="log", xmode="log",
-#         xlabel=L"$r_b$", ylabel = L"$|Du_b|$",
-#         xmin=axis[1],ymin=axis[3],xmax=axis[2],ymax=axis[4]
-#         )
-#     if slope != nothing
-#         xs = slope[1:2]
-#         ys = slope[3] * slope[1:2].^slope[4]
-#         ps = Plots.Linear(xs, ys, mark="none", style="red, dotted, thick")
-#         push!(p, ps)
-#     end
-#     if label != nothing
-#         ps = Plots.Node(label[1], label[2], label[3])
-#         push!(p, ps)
-#     end
-#     return p
-# end
