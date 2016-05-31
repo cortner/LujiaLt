@@ -295,7 +295,11 @@ function plot_acgeom(ac; axis=autoaxis(ac.X), lwidth=0.6,
 
    Xghost, _ = LujiaLt.lattice_ball( R = maximum(2*sqrt(sumabs2(ac.X,1))) )
 
+   Xbdry = ac.X[:, setdiff(1:size(ac.X,2), ac.Ifree)]
+
    ctx = compose( context(axis),
+                  # atomistic nodes
+                  compose_atoms(Xbdry, [0.15], 0.0, axis, blue),
                   # atomistic nodes
                   compose_atoms(ac.X[:,Ia], [0.15], 0.0, axis, red),
                   # interface nodes
