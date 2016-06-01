@@ -132,7 +132,7 @@ auto_img(ImgT, fname, ax, width) = ImgT(fname, width, relative_height(ax, width)
 function compose_defint(axis)
    # a shaded polygon
    r = 0.4; a = sqrt(3)/2
-   poly = [ (-r, 0.0); (0.5, -a-r); (1.0+r, 0.0); (0.5, a+r) ]
+   poly = [ (-0.5-r, 0.0); (0.0, -a-r); (0.5+r, 0.0); (0.0, a+r) ]
    return ( context(axis), polygon(poly), stroke("grey50"), fill("grey90") )
 end
 
@@ -147,9 +147,9 @@ function plot_int(X, B, ee; axis=autoaxis(X), lwidth=0.6,
                    # homogeneous lattice atoms
                    compose_atoms(X, [0.15], 0.5, axis, blue),
                    # normal bonds
-                   compose_bonds(X, B[:, find(ee .<= 1e-10)], lwidth, blue, axis),
+                   compose_bonds(X, B[:, find(abs(ee) .<= 1e-10)], lwidth, blue, axis),
                    # defect bonds
-                   compose_bonds(X, B[:, find(ee .> 1e-10)], lwidth, red, axis),
+                   compose_bonds(X, B[:, find(abs(ee) .> 1e-10)], lwidth, red, axis),
                    # defect region
                    compose_defint(axis) )
 
@@ -165,9 +165,9 @@ end
 
 _reflect_(x::Array) = [1 0; 0 -1] * x
 
-function plot_screw(X, B, ee; axis=autoaxis(X), lwidth=0.6,
+function plot_screw(X, B, ee; axis=autoaxis(_reflect_(X)), lwidth=0.6,
                   filename=nothing, printwidth = 10cm, plotwidth=15cm,
-                  ξ = [0.5;sqrt(3)/6] )
+                  ξ = [0.0;0.0]) # [0.5;sqrt(3)/6]
    X = _reflect_(X); ξ = _reflect_(ξ)
    B = tup2mat(B)
    ctx = compose( context(axis),
@@ -285,7 +285,7 @@ plot_slope(x1, x2, c, s; col="black") =
 
 
 
-function plot_acgeom(ac; axis=autoaxis(ac.X), lwidth=0.6,
+function plot_acgeom(ac; ξ=[0.0;0.0], axis=autoaxis(ac.X), lwidth=0.6,
                      filename=nothing, printwidth = 10cm, plotwidth=15cm)
 
    # node indices
@@ -293,8 +293,8 @@ function plot_acgeom(ac; axis=autoaxis(ac.X), lwidth=0.6,
    Ia = setdiff(union(ac.Bat[1], ac.Bat[2]), Ii)
    Ic = setdiff(collect(1:size(ac.X,2)), union(Ii, Ia))
 
-   Xghost, _ = LujiaLt.lattice_ball( R = maximum(2*sqrt(sumabs2(ac.X,1))) )
-
+   # some other atom fields that we want to plot
+   Xghost = LujiaLt.lattice_ball( R = maximum(2*sqrt(sumabs2(ac.X,1))) )[1] .+ ξ
    Xbdry = ac.X[:, setdiff(1:size(ac.X,2), ac.Ifree)]
 
    ctx = compose( context(axis),

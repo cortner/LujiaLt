@@ -121,6 +121,7 @@ elements(tri::Triangulation) = tri
 Base.start(::Triangulation) = 0
 Base.done(tri::Triangulation, state::Int) = (state == nT(tri))
 Base.next(tri::Triangulation, state::Int) = ( P1element(state+1, tri), state+1 )
+Base.length(tri::Triangulation) = nT(tri)
 
 # TODO: consider reviving this!
 # TriU = Tuple{Triangulation, Vector}
