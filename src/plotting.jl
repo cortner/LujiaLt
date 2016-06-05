@@ -7,6 +7,8 @@ import LujiaLt.Potentials: nndist
 import LujiaLt.MDTools: NeighbourList, uniquepairs
 import LujiaLt: Model, Atm, Domain, positions
 
+export plot 
+
 const ljatcol = "tomato"
 const ljbondcol = "darkblue"
 const ljlinecol = "darkblue"

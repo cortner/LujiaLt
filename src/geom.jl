@@ -204,7 +204,6 @@ end
 
 "remove an atom from the geometry, usually to create a vacancy"
 function add_atom!(geom::Domain, x0::Vector)
-   Iall = setdiff(1:nX(geom), idx)
    X = [positions(geom) x0]
    geom.mark = [geom.mark; 0]
    geom.nA = geom.nA + 1

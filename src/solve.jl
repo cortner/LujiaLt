@@ -55,11 +55,13 @@ end
 * `randomise = 0.0` : randomise the initial condition (mostly for testing)
 * `gtol = 1e-6` : gradient tolerance
 * `display_result = false` : display solver statistics
+* `method = ConjugateGradient` : change the optimiser
 """
 function solve(m::Model;
                randomise = 0.0,
                tol = 1e-6,
-               display_result = false )
+               display_result = false,
+               Optimiser = ConjugateGradient )
    # this needs more boiler plate later on, but for now we can just
    # minimise
    #
@@ -74,8 +76,8 @@ function solve(m::Model;
    obj1 = (x, out) -> copy!(out, grad(m, x))
    P = preconditioner(m, x0)
    result = Optim.optimize( DifferentiableFunction(obj, obj1), x0,
-                              method = ConjugateGradient(P=P),
-                              ftol=1e-32, grtol=tol )
+                              method = Optimiser(P=P),
+                              ftol=0.0, grtol=tol )
    # TODO: analyse `result` more carefully
    if display_result
       println(result)
