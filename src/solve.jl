@@ -8,6 +8,9 @@ import LujiaLt: Model, free_defm_indices, defm2dofs, dofs2defm,
 import LujiaLt.Potentials: nndist, rdim
 import LujiaLt.MDTools: NeighbourList, sites
 
+export solve
+
+
 """
 `preconditioner(m::Model, Y::Matrix)`
 `preconditioner(m::Model, dof::Vector)`
@@ -51,12 +54,12 @@ end
 
 * `randomise = 0.0` : randomise the initial condition (mostly for testing)
 * `gtol = 1e-6` : gradient tolerance
+* `display_result = false` : display solver statistics
 """
 function solve(m::Model;
                randomise = 0.0,
                tol = 1e-6,
-               display_result = false
-               )
+               display_result = false )
    # this needs more boiler plate later on, but for now we can just
    # minimise
    #
@@ -79,6 +82,8 @@ function solve(m::Model;
    end
    return dofs2defm(m, result.minimum)
 end
+
+
 
 
 # function minimise(; obj=nothing, grad=nothing, x0=nothing,
@@ -108,8 +113,6 @@ end
 #  * implement CG solver from shewchuck; Matlab code copied below.
 
 
-include("solve_old.jl")
-
-
+# include("solve_old.jl")
 
 end

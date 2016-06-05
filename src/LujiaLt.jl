@@ -93,9 +93,6 @@ abstract Model
 export Model
 
 
-# some auxliary plotting functionality (needs to be defined after Domain)
-include("plotting.jl")
-
 # parts of main-module
 include("geom.jl")
 
@@ -110,6 +107,9 @@ include("atcmodels.jl")
 
 # interface to nonlinear solvers
 include("solve.jl")
+
+# some auxliary plotting functionality (needs to be defined after Domain)
+include("plotting.jl")
 
 # codes to help test the package
 include("testing.jl")

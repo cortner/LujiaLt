@@ -250,4 +250,35 @@ end
 
 
 
+# import Compose.compose
+# """
+# visualise the domain and if passed deformation or displacement
+# """
+# function compose(geom::Domain;
+#                  Y=nothing, U=nothing,
+#                  axis=:auto, lwidth=:auto)
+#     if axis == :auto
+#         axis = Plotting.autoaxis(positions(geom))
+#     end
+#     if lwidth == :auto
+#         lwidth = 0.3
+#     end
+#     # plot core atomistic nodes
+#     ctx_atm = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .== 0)];
+#                                      axis=axis, fillcolor="tomato")
+#     # plot buffer nodes
+#     ctx_buf = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .> 0)];
+#                                      axis=axis,
+#                                      fillcolor="aliceblue",
+#                                      linecolor="darkblue" )
+#     # ctx_cb = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .< 0)];
+#     #                                 axis=axis, fillcolor="aliceblue")
+#     # plot the finite element mesh (should we remove the inner triangles)?
+#     ctx_cb = Plotting.compose_elements(geom.tri.X, geom.tri.T;
+#                                        axis=axis, lwidth=lwidth)
+#     return Compose.compose( context(), ctx_atm, ctx_buf, ctx_cb )
+# end
+
+
+
 end # module FEM

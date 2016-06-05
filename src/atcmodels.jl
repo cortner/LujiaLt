@@ -1,11 +1,11 @@
 
-import .Potentials: SitePotential, StandardSitePotential, rdim
+import .Potentials: SitePotential, StandardSitePotential, rdim, cutoff
+
 
 
 "return a string label that described the model"
 label{T <: Model}(::T) = error("no label defined for $T")
 export label
-
 
 ################### Some generic dof-conversion functions
 # any model that wants to use these must have the fields
@@ -66,6 +66,8 @@ function reference_configuration(geom::Domain, V::StandardSitePotential)
     return copy(positions(geom))
 end
 
+
+positions(m) = positions(m.geom)
 
 
 ##################### Basic Atomistic Model ###################################

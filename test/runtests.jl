@@ -71,6 +71,9 @@ end
 
 #############################################################################
 
+at = Atm(V=ToyEAMPotential(), Ra=4.1, defect=:interstitial)
+
+
 # @assert test_toyeam()
 # @assert test_Atm()
-@assert test_solve()
+# @assert test_solve()

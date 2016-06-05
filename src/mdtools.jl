@@ -9,7 +9,7 @@ export NeighbourList
 
 """`type NeighbourList`
 
-Implements a fast neighbourlist computation, loosely based on 
+Implements a fast neighbourlist computation, loosely based on
 [https://github.com/libAtoms/matscipy](MatSciPy).
 
 ### Usage
@@ -87,7 +87,7 @@ function NeighbourList(X::Matrix{Float64}, cutoff::Float64)
     for i = 1:dim
         minX[i], maxX[i] = extrema(sub(X, i, :))
         # the 1.0001 ensures that all atoms are strictly inside the upper face
-        L[i] = 1.0001 * (maxX[i] - minX[i])   
+        L[i] = 1.0001 * (maxX[i] - minX[i])
         ncells[i] = max(1, floor(Int, L[i] / cutoff))
     end
     ncells_tup = tuple(ncells...)
@@ -102,11 +102,11 @@ end
 function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
                                    minX::Vector{Float64},
                                    L::Vector{Float64},
-                                   ncells::NTuple{DIM, Int}, 
+                                   ncells::NTuple{DIM, Int},
                                    X::Matrix{Float64}, cutoff::Float64)
-    
+
     ncells_tot = prod(ncells)
-    
+
     # allocate space for a CCS-type linked-list
     seed = zeros(Int, ncells)   # the first atom in each bin
     last = zeros(Int, ncells)   # the currently last atom in each bin
@@ -116,7 +116,7 @@ function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
     for n = 1:nX
         # compute bin index from current position X[:, n]
         bin = binindex_linear(n, ncells, X, minX, L)
-        
+
         # check whether it is a seed
         if seed[bin] == 0
             seed[bin] = n
@@ -126,7 +126,7 @@ function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
             last[bin] = n
         end
     end
-    
+
     # now loop over atoms again to determine the neighbours
     alloc_fac = 12
     rsq = zeros(alloc_fac*nX)     # store square or distances
@@ -143,11 +143,11 @@ function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
     for n = 1:nX
         # get cell-index again
         bin = binindex_linear(n, ncells, X, minX, L)
-        
+
         for nbin in neig_bins!(ncells, bin, neig_bins)
             # skip this bin if it is outside the cell
             if nbin < 1 || nbin > ncells_tot; continue; end
-                
+
             # loop through atoms in the nbin bin
             m = seed[nbin]
             @inbounds while m > 0
@@ -155,7 +155,7 @@ function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
                     r_nm2 = 0.0
                     # need to use a generated function for this, probably not
                     # worthwhile?
-                    # @nexprs DIM a->( R_nm[a] = X[a,m]-X[a,n];   
+                    # @nexprs DIM a->( R_nm[a] = X[a,m]-X[a,n];
                     #                  r_nm2 += R_nm[a]*R_nm[a] )
                     for a = 1:DIM   # should probably be unrolled
                         R_nm[a] = X[a,m]-X[a,n]
@@ -193,7 +193,7 @@ function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
             end  # end loop over atoms in neighbouring bin
         end # loop over bins
     end # loop over atoms
-        
+
     # fix the `first` array in case one of the atoms has no neigbours at all?!
     # this makes sure that, if n has no neighbours, then first[n] == first[n+1]
     # and as a result the range first[n]:first[n+1] is empty.
@@ -205,16 +205,16 @@ function assemble_nlist_inner{DIM}(dim::Int, nX::Int,
             lastfirst = first[n]
         end
     end
-    
+
     gc_enable(true)
-    
+
     # postprocess the arrays
     # Rm = reshape(R, dim, length(i))
     Rm = reshape(R, DIM, length(i))[:, 1:npairs]
     i = i[1:npairs]
     j = j[1:npairs]
     rsq = rsq[1:npairs]
-    
+
     # return the completed neighbour-list
     return NeighbourList(i, j, Rm, sqrt(rsq), first)
 end
@@ -223,7 +223,7 @@ end
 # #################### access functions for the neighbourlist  #################
 
 export neighbours
-"""basic access function to list of neighbours; better to iterature 
+"""basic access function to list of neighbours; better to iterature
 via `sites(nlist)`; probably remove this!
 """
 neighbours(nlist, n) = nlist.j[nlist.first[n]:nlist.first[n+1]-1]
@@ -244,9 +244,15 @@ function Base.next(nlist::NeighbourList, state::Int)
                  nlist.r[inds],
                  nlist.R[:, inds]
                  )
-    return ret_tuple, state    
+    return ret_tuple, state
 end
 
+
+function uniquepairs(nlist::NeighbourList)
+   ij = sort([nlist.i nlist.j], 2)
+   ij = unique(ij, 1)
+   return (ij[:,1], ij[:, 2])
+end
 
 
 end
