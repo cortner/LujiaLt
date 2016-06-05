@@ -10,17 +10,33 @@ import .MDTools: NeighbourList, sites
 """
 * `V::SitePotential` : site energy encoding the atomistic model
 * `X::Matrix{Float64}` : positions
-* `vol` : effective volumes (default 1)
 """
-function at_energy(V::SitePotential, X::Matrix{Float64}, vol::Vector{Float64})
+function at_energies(V::SitePotential, X::Matrix, vol)
     nlist = NeighbourList(X, cutoff(V))
     E = zeros(size(X, 2))
     for (n, neigs, r, R) in sites(nlist)
         if vol[n] <= 0.0; continue; end    # skip vol-0 sites
-        E[n] = vol[n] * V(r, R)
+        E[n] = V(r, R)
     end
-    return sum_kbn(E)
+    return E
 end
+
+"""
+`at_energy(V::SitePotential, X::Matrix, vol::Vector)`
+
+compute potential energy ∑ vol[i] V(Dx(i))
+"""
+at_energy(V::SitePotential, X::Matrix, vol::Vector) =
+   sum_kbn( vol .* at_energies(V, X, vol) )
+
+"""
+`at_energy_diff(V::SitePotential, X::Matrix, Xref::Matrix, vol::Vector)`
+
+compute potential energy difference ∑ vol (V(Dx) - V(Dx_ref))
+"""
+at_energy_diff(V::SitePotential, X::Matrix, Xref::Matrix, vol::Vector) =
+   sum_kbn( vol .* (at_energies(V, X, vol) - at_energies(V, Xref, vol)) )
+
 
 """
 * `V::SitePotential` : site energy encoding the atomistic model

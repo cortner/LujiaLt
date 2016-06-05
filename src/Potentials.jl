@@ -5,7 +5,7 @@ export SitePotential
 export evaluate, grad
 export ToyEAMPotential
 # export fcut, fcut1, swcut, swcut1
-export rdim
+export rdim, nndist, cutoff
 
 
 """
@@ -21,6 +21,7 @@ abstract StandardSitePotential <: SitePotential
 
 "site potentials for anti-plane displacements"
 abstract AntiplaneSitePotential <: SitePotential
+
 
 
 ########################## CUTOFF FUNCTION #################################
@@ -51,29 +52,34 @@ function fcut1(r, cutoff)
 end
 
 
-"""SW-type cutoff function  `function cutoff(r, Rc, lc)`
+### Unused so far, but keep it here for future use
+# """SW-type cutoff function  `function cutoff(r, Rc, lc)`
+#
+# ## Input:
+# *    r  : variable
+# *    Rc : cutoff radius
+# *    lc : cutoff weight
+# """
+# swcut(r::Float64, Rc, lc) =
+#     (r >= Rc-0.01) ? 0.0 : 1.0 / ( 1.0 + exp( lc / (Rc-r) ) )
+# swcut(r::Array{Float64}, Rc, lc) =
+#     Float64[ swcut(r[i], Rc, lc) for i in eachindex(r) ]
+# "first derivative of `swcut`"
+# swcut1(r, Rc, lc) =
+#     ( (r >= Rc-0.01) ? 0.0 :
+#       -1.0 / (1.0 + exp(lc/(Rc-r)))^2 * exp(lc/(Rc-r)) * (lc / (Rc-r)^2) )
+# swcut1(r::Array{Float64}, Rc, lc) =
+#     Float64[ swcut1(r[i], Rc, lc) for i in eachindex(r) ]
 
-## Input:
-*    r  : variable
-*    Rc : cutoff radius
-*    lc : cutoff weight
-"""
-swcut(r::Float64, Rc, lc) =
-    (r >= Rc-0.01) ? 0.0 : 1.0 / ( 1.0 + exp( lc / (Rc-r) ) )
-swcut(r::Array{Float64}, Rc, lc) =
-    Float64[ swcut(r[i], Rc, lc) for i in eachindex(r) ]
-"first derivative of `swcut`"
-swcut1(r, Rc, lc) =
-    ( (r >= Rc-0.01) ? 0.0 :
-      -1.0 / (1.0 + exp(lc/(Rc-r)))^2 * exp(lc/(Rc-r)) * (lc / (Rc-r)^2) )
-swcut1(r::Array{Float64}, Rc, lc) =
-    Float64[ swcut1(r[i], Rc, lc) for i in eachindex(r) ]
+
+
+########################## Lennard-Jones MODEL #################################
+# TODO
 
 
 ########################## TOY EAM MODEL #################################
 
-"""
-E_n = ∑_ρ ϕ(D_ρ) + F( ∑_ρ ψ(D_ρ) )
+"""E_n = ∑_ρ ϕ(D_ρ) + F( ∑_ρ ψ(D_ρ) )
 ϕ(r) = exp(-2 A (r-1)) - 2 exp(- A(r-1))
 ψ(r) = exp(- B (r-1))
 F(t) = 0.5 (t-psi0)^2 + C 0.25 (t-psi0)^4
@@ -86,39 +92,36 @@ type ToyEAMPotential <: StandardSitePotential
     cutoff
 end
 
-
-function ToyEAMPotential(; A=4.0, B=3.0, C=5.0, psi0=6*exp(- B*0.1), cutoff=(1.5, 2.1))
+# default constructor
+ToyEAMPotential(; A=4.0, B=3.0, C=1.0, psi0=6*exp(B*0.03), cutoff=(1.5, 2.1)) =
     ToyEAMPotential(A, B, C, psi0, cutoff)
-end
 
+# implementation of the potential properties
 cutoff(pot::ToyEAMPotential) = pot.cutoff[2]
 rdim(pot::ToyEAMPotential) = 2
+nndist(pot::ToyEAMPotential) = 1.0
 
 morse(r, A) = exp(-2*A*(r-1)) - 2 * exp(-A*(r-1))
 morse1(r, A) = -2*A*(exp(-2*A*(r-1)) - exp(-A*(r-1)))
 morse(r, A, cutoff) = morse(r, A) .* fcut(r, cutoff)
 morse1(r, A, cutoff) =
     morse1(r, A) .* fcut(r, cutoff) + morse(r, A) .* fcut1(r, cutoff)
-team_embed(t, C) = 0.5 * t^2 + C * 0.25 * t^4
-team_embed1(t, C) = t + C * t^3
-team_eldens(r, B, cutoff) = sum(exp(-B*(r-1)) * fcut(r, cutoff))
+team_embed(t, C, t0) = 0.5 * (t/t0-1.0)^2 + C * 0.25 * (t/t0-1.0)^4
+team_embed1(t, C, t0) = ((t/t0-1.0) + C * (t/t0-1.0)^3)/t0
+team_eldens(r, B, cutoff) = sum(exp(-B*(r-1)) .* fcut(r, cutoff))
 team_eldens1(r, R, B, cutoff) =
     R .* (exp(-B*(r-1)) .* (fcut1(r, cutoff) - B * fcut(r, cutoff)) ./ r)'
 
-evaluate(p::ToyEAMPotential, r, R) = sum(morse(r, p.A, p.cutoff))
+evaluate(p::ToyEAMPotential, r, R) = (sum(morse(r, p.A, p.cutoff)) +
+               team_embed( team_eldens(r, p.B, p.cutoff), p.C, p.psi0 ) )
 
-    # (sum(morse(r, p.A, p.cutoff)) +
-    #  team_embed( team_eldens(r, p.B, p.cutoff), p.C )
-    #  )
-    
-grad(p::ToyEAMPotential, r, R) =
-    R .* (morse1(r, p.A, p.cutoff)./r)'
+grad(p::ToyEAMPotential, r, R) = ( R .* (morse1(r, p.A, p.cutoff)./r)' +
+                     team_embed1( team_eldens(r, p.B, p.cutoff), p.C, p.psi0 ) *
+                     team_eldens1(r, R, p.B, p.cutoff) )
 
-    # ( R .* (morse1(r, p.A, p.cutoff)./r)' +
-    #   team_embed1( team_eldens(r, p.B, p.cutoff), p.C ) *
-    #   team_eldens1(r, R, p.B, p.cutoff)
-    #   )
 
+########################## Gupta Potential #################################
+# TODO
 
 
 end

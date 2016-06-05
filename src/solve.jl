@@ -1,186 +1,111 @@
 
 module Solve
 
+using Optim
+
+import LujiaLt: Model, free_defm_indices, defm2dofs, dofs2defm,
+            grad, evaluate
+
+"""
+`preconditioner(m::Model, Y::Matrix)`
+`preconditioner(m::Model, dof::Vector)`
+
+Preconditioner for a standard model (where the dofs are the
+   displacements or positions)
+
+* m : model description (e.g., Atm)
+* Y : rdim x N matrix of (e.g.) positions
+"""
+function preconditioner_scalar(m::Model, Y::Matrix)
+   # get a nearest-neighbour list (+ a bit)
+   rnn = nndist(m.V)
+   nlist = NeighbourList(X, 1.5 * rnn)
+   # allocate a triplet format
+   I = Int[]; J = Int[]; Z = Float64[];
+   # loop through sites and neighbours
+   for (n, neigs, r, R) in sites(nlist)
+      for j in neigs
+         push!(I, n); push!(J, j); push!( Z, exp(-3.0*(r-rnn)) )
+      end
+   end
+   # create sparse matrix and stabilise a bit
+   P = sparse(I, J, Z, size(Y,2), size(Y, 2)) + 0.01 * speye(size(Y,2))
+   return kron(P, eye(rdim(m.V)))
+end
+
+function preconditioner(m::Model, dof::Vector)
+   P = preconditioner(m, dofs2defm(m, dof))[m.Ifree, m.Ifree]
+   J = free_defm_indices(m)
+   return P[J, J]
+end
+
+
+"""
+`function solve(m::Model; kwargs...)`
+
+## Keyword arguments
+
+* `randomise = 0.0` : randomise the initial condition (mostly for testing)
+* `gtol = 1e-6` : gradient tolerance
+"""
+function solve(m::Model;
+               randomise = 0.0,
+               tol = 1e-6,
+               display_result = false
+               )
+   # this needs more boiler plate later on, but for now we can just
+   # minimise
+   #
+   # TODO: depending on the model call a minimise function
+   #       of an fzero function
+   #
+   x0 = defm2dofs(m, copy(m.Yref))
+   if randomise > 0
+      x0 += randomise * 2.0 * (rand(size(x0)) - 0.5)
+   end
+   obj = x -> evaluate(m, x)
+   obj1 = (x, out) -> copy!(out, grad(m, x))
+   P = nothing; # preconditioner(m, x0)
+   result = Optim.optimize( DifferentiableFunction(obj, obj1), x0,
+                              method = ConjugateGradient(P=P),
+                              ftol=1e-32, grtol=tol )
+   # TODO: analyse `result` more carefully
+   if display_result
+      println(result)
+   end
+   return dofs2defm(m, result.minimum)
+end
+
+
+# function minimise(; obj=nothing, grad=nothing, x0=nothing,
+#                   alpha0 = 1.0, tol = 1e-4, precon = 1.0,
+#                   maxnit = 1_000, Carmijo = 0.2,
+#                   displevel = 2, alpha_min = 1e-8 )
+#
+#    # interface Optim.jl
+#
+# end
+
+
+
+function fzero(;obj=nothing, grad=nothing, x0=nothing,
+                  alpha0 = 1.0, tol = 1e-4, precon = 1.0,
+                  maxnit = 1_000, Carmijo = 0.2,
+                  displevel = 2, alpha_min = 1e-8)
+
+   # this will use
+end
+
+
+
+
 # TODO:
 #  * move everything to just using Optim.jl
 #  * implement CG solver from shewchuck; Matlab code copied below.
 
 
+include("solve_old.jl")
 
-# steepest descent with quadratic line-search
-function minimise(;obj=nothing, grad=nothing, x0=nothing,
-                  alpha0 = 1.0, tol = 1e-4, precon = 1.0,
-                  maxnit = 1_000, Carmijo = 0.2,
-                  displevel = 2, alpha_min = 1e-8)
 
-    # evaluate the objective
-    x = x0
-    E = obj(x)
-    ∇E = grad(x)
-    Ediff = -0.0
-    alpha = 0.0
 
-    if displevel >= 2
-        @printf("  nit |    ΔE       |∇E|∞      α \n")
-        @printf("------|--------------------------\n")
-    end
-    for nit = 1:maxnit
-        if displevel >= 2
-            @printf("%4d | %4.2e  %4.2e  %4.2e \n",
-                    nit, Ediff, norm(∇E, Inf), alpha)
-        end
-        # if residual is less than tolerance >> terminate
-        if norm(∇E, Inf) < tol
-            if displevel > 0
-                println("`minimise` success: residual tolerance reached. ")
-            end
-            return x, E, ∇E
-        end
-        
-        if nit > 1
-            # TODO TODO 
-            # extrapolate the step-length (TODO)
-            # probably do a secant or BB update?
-            alpha = alpha * 1.1
-        elseif alpha0 == :auto
-            alpha = min(1.0, 1.0/norm(∇E, Inf))
-        else
-            alpha = alpha0
-        end
-
-        # compute energy-difference
-        # note that, if `obj` returns site energies, then the
-        # sum_kbn([Enwq; -E]) is a robust way to determine the
-        # energy-difference. If just total energies are computed,
-        # then this is equivalent to `Ediff = Enew - E`.
-        ∇E_sq = sumabs2(∇E)
-        Enew = obj(x - alpha * ∇E)
-        Ediff = sum_kbn([Enew; -E])   
-        while Ediff > - alpha * Carmijo * ∇E_sq
-            # TODO TODO 
-            alpha = alpha / 4
-            if alpha < alpha_min
-                warn("`minimise` failure: alpha < alpha_min")
-                return x, E, ∇E
-            end
-            Enew = obj(x - alpha * ∇E)
-            Ediff = sum_kbn([Enew; -E])   
-        end
-        
-        # do the official update
-        x = x - alpha * ∇E
-        Eold = E
-        E = Enew
-        ∇Eold = ∇E
-        ∇E = grad(x)
-    end
-
-    # the only way to exit from the for-loop is if nit == maxnit
-    warn("`minimise` failure: nit > max_nit")
-    return x, E, ∇E
 end
-
-
-
-
-# # CG or BFGS with Armijo + restart
-
-
-# function ncg_force(; grad=nothing, x0=nothing, tol = 1e-4,
-                   
-#                    )
-
-# # basic static iteration with force-based (non-)linesearch?
-
-# function ncg_force(; grad=nothing, x0=nothing,
-#                    alpha0 = 1.0, tol = 1e-4, precon = 1.0,
-#                    maxnf = 1_000, Carmijo = 0.2,
-#                    displevel = 2, alpha_min = 1e-8,
-#                    σ0 = 0.1)
-
-#     # allocate some stuff
-#     N = length(x0)
-#     u = x0             # current state
-#     u_aux = copy(x0)
-    
-#     # Evaluate first force and search direction
-#     F = grad(u)
-#     p = F
-
-#     # some initialisation
-#     δ_new = dot(F, p)
-#     δ0 = δ_new
-#     nf = 0
-#     res_inf = norm(F, Inf)
-    
-#     while nf < maxnf && res_inf > tol
-#         # I have no idea what all this is ?!?!?
-#         sec_iter = 0
-#         δ = dot(p, p)    #delta_D = δ
-#         α = - σ0
-#         u_aux = u + σ0 * p
-#         F_new = grad(u_aux)
-#         η_prev = dot(F_new, p);
-#         η = dot(-F, p);
-#         α *= η / (η_prev - η)
-#         u += α * p
-#         η_prev = η
-#         sec_iter += 1
-#         #  Perform secant iteration loop
-#         while sec_iter < max_sec_iter && α^2 * δ > tol^2
-#             F = grad(u)
-#             η = dot(F, p)
-#             α *= η / (η_prev - η)
-#             u += α * p
-#             η_prev = η
-#             sec_iter += 1
-#         end
-        
-        
-        
-#     end
-    
-end
-
-    
-    
-    
-# #     force = -bqcf(u);
-    
-# #     delta_OLD = delta_NEW;
-# #     delta_MID = dot(force,sForce);
-    
-# #     %In this step would compute a preconditioner
-# #     sForce = force;  %would be sForce = M^(-1)force
-
-# #     delta_NEW = dot(force,sForce);
-# #     beta = (delta_NEW-delta_MID)/delta_OLD;
-# # %     disp('Here!!!!!');
-# # %     pause;
-# # %     disp('Delta_NEW');
-# # %     disp(delta_NEW);
-# # %     disp('beta');
-# # %     disp(beta);
-# # %     pause;
-# #     if beta <= 0
-# #         direction = sForce;
-# #     else
-# #         direction = sForce + beta*direction;
-# #     end
-# #     iter = iter+1;
-# #     fprintf('frc : %4.2e,  \n', delta_NEW);
-# #     fprintf('delta_D : %4.2e,  \n', delta_D);
-# #     fprintf('delta_MID : %4.2e,  \n', delta_MID);
-# #     fprintf('delta_OLD : %4.2e,  \n', delta_OLD);
-# #     fprintf([' sec_iter = ', num2str(sec_iter)]);
-# #     fprintf(' beta = %4.2e,  ', beta);
-# #     fprintf(' alpha = %4.2e,  ', alpha);
-# #     disp(['|U|_inf = ', num2str(norm(u(:), Inf))]);
-    
-# # end
-
-# # disp(iter);
-# # disp(delta_NEW);
-# # pause;
-
-# # end

@@ -17,9 +17,6 @@ import .Potentials.SitePotential
 # some basic FEM methodology
 include("fem.jl")
 
-# nonlinear solvers
-include("solve.jl")
-
 
 # this type is not in geom.jl because Plotting depends on it
 # while geom again depends on Plotting.
@@ -68,15 +65,12 @@ type Domain
 end
 export Domain
 
-# some auxliary plotting functionality (needs to be defined after Domain)
-include("plotting.jl")
-
 
 """
-A `Model` is a complete description of the computational task, including the
-interatomic potential (SitePotential or TB-Hamiltonian), the geometry (Domain)
-whether it is fully atomistic, a/c, qm/mm, etc. The following models have been
-implemented:
+A `AbstractModel` is a complete description of the computational task, including
+the interatomic potential (SitePotential or TB-Hamiltonian), the geometry
+(Domain) whether it is fully atomistic, a/c, qm/mm, etc. The following models
+have been implemented:
 
 * ATM
 * BQCE (todo)
@@ -98,6 +92,10 @@ vector.
 abstract Model
 export Model
 
+
+# some auxliary plotting functionality (needs to be defined after Domain)
+include("plotting.jl")
+
 # parts of main-module
 include("geom.jl")
 
@@ -109,6 +107,9 @@ include("assemble.jl")
 
 # concrete implementations of `Model` of a/c type
 include("atcmodels.jl")
+
+# interface to nonlinear solvers
+include("solve.jl")
 
 # codes to help test the package
 include("testing.jl")

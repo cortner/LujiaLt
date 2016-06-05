@@ -19,7 +19,7 @@ function fdtest(F::Function, dF::Function, x)
     @printf("---------|----------- \n")
     @printf("    h    | error \n")
     @printf("---------|----------- \n")
-    for p = 3:10
+    for p = 2:11
         h = 0.1^p
         dEh = zeros(dE)
         for n = 1:length(dE)
@@ -45,6 +45,5 @@ end
 "finite-difference test of a SitePotential V"
 fdtest(V::SitePotential, X) =
     fdtest(x->at_energy(V, x), x->at_energy1(V, x), X)
-
 
 end

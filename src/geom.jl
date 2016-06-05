@@ -8,33 +8,10 @@ export nX, positions, dist, remove_atom!
 #
 # here we collect some functions that generate and manipulate
 # simple lattice geometries, add defects, etc.
+# the `Domain` type is already defined in LujiaLt.jl
 #
 
 const Atri=[1.0 cos(pi/3); 0.0 sin(pi/3)]
-
-
-# """Basic Lujia-Lt geometry type
-# * `X` : physical reference coordinates (both atomistic and FEM)
-# * `Z` : lattice index (integer) reference coordinates
-# * `mark`: 0 = atomistic, > 0 atomistic, but not core, < 0 continuum node;
-#      this gives users the flexibility to give more information to the markers
-# * `A` : lattice matrix
-
-# ## Notes
-
-# *  X[:, 1:nA] = A * Z are the atomistic nodes; in particular note that FEM nodes
-#     don't have a corresponding Z entry
-# """
-# type Domain
-#     X::Matrix{Float64}
-#     Z::Matrix{Int32}
-#     mark::Vector{Int8}
-#     A::Matrix{Float64}
-#     nA::Int
-#     tri::FEM.Triangulation
-#     info::Dict
-# end
-
 
 # usual trick to allow more parameters to be stored
 Base.getindex(geom::Domain, idx) = geom.info[idx]
@@ -65,7 +42,7 @@ function lattice_ball(;R=5.0, A=Atri, x0=[0.0;0.0])
     Z = twogrid_list(-ndim:ndim, -ndim:ndim)
     # convert to physical reference configuration
     X = A * Z
-    # keep only the points inside Ra+Rbuf
+    # keep only the points inside R
     I = find(dist(X, x0) .<= R)
     X = X[:, I]
     Z = Z[:, I]
@@ -75,7 +52,8 @@ end
 
 "construct FEM nodes on an annulus"
 function radial_nodes(Rin, Rout;
-                     hin = 1.0, hgrowth=1.5, growthbound=3.0, x0=[0.0;0.0])
+                      hin = 1.0, hgrowth=1.5, growthbound=3.0,
+                      x0=[0.0;0.0])
    # arrays to be returned
    X = Float64[]    # positions of nodes
    mark = Int[]     # markers (layers)
@@ -83,7 +61,6 @@ function radial_nodes(Rin, Rout;
    # create an array of radii and mesh sizes that we can adjust to the
    # requires Rc, before doing the actual assembly
    #####   <<<<<<<<  TODO
-   #####
 
    # initialise
    r = Rin-hin
@@ -115,24 +92,21 @@ end
 
 
 
-function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
+function Domain(; A=nothing, Ra=5.0, Rc=0.0,
                 lattice=:triangular, defect=:none, shape=:ball,
                 meshparams = [1.5; 3.0], x0 = :auto )
 
-    if shape != :ball
-        error("Domain: `shape` parameter allows only `:ball` at present")
-    end
+   if shape != :ball
+      error("Domain: `shape` parameter allows only `:ball` at present")
+   end
 
-    # get the lattice matrix
-    if A == nothing
-        if lattice == :triangular
-            AA = Atri
-        else
-            error("lattice_ball : only triangular lattice supported")
-        end
-    else
-        AA = A
-    end
+   # get the lattice matrix
+   if A == nothing
+      lattice == :triangular ? AA = Atri :
+         error("lattice_ball : only triangular lattice supported")
+   else
+      AA = A
+   end
 
     # default defect core position
     if x0 == :auto
@@ -145,7 +119,8 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
       end
    end
 
-    X, Z = lattice_ball(A=AA, R=Ra + Rbuf, x0=x0)
+
+    X, Z = lattice_ball(A=AA, R=Ra, x0=x0)
     # collect some information
     nA = size(X, 2)
     Ia_core = find( dist(X, x0) .<= Ra )
@@ -155,11 +130,10 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0, Rbuf=0.0,
    #  ============================
    #  now the continuum component
    #  ============================
-   if Rc > Ra+Rbuf
-      R0 = Ra+Rbuf                           # initial radius
-      # H0 = minimum( setdiff(dist(X), 0.0) )  # initial mesh-size
-      X_c, mark_c = radial_nodes(R0 + 0.6*H0, Rc,
-                     hgrowth=meshparams[1], growthbound=meshparams[2])
+   if Rc > Ra
+      X_c, mark_c = radial_nodes(Ra + 0.6, Rc,
+                                 hgrowth=meshparams[1],
+                                 growthbound=meshparams[2])
       # add to existing array
       X = [X X_c]
       mark = [mark; mark_c]
@@ -197,9 +171,12 @@ end
 
 "number of nodes (not free nodes!)"
 nX(geom::Domain) = size(geom.tri.X, 2)
+
 "reference to position array, same as `X`"
 positions(geom::Domain) = geom.tri.X
-"""domain dimension - currently this must always be 2; this function is
+
+"""
+domain dimension - currently this must always be 2; this function is
 included to ensure readability of some parts of the code. (and for the future
 allow an extension maybe?)
 """
@@ -208,23 +185,33 @@ ddim(geom::Domain) = 2
 
 "remove an atom from the geometry, usually to create a vacancy"
 function remove_atom!(geom::Domain, idx)
-    if geom.mark[idx] != 0
-        error("remove_atom! : only allowed to remove core atoms")
-    end
-    Iall = setdiff(1:nX(geom), idx)
-    X = positions(geom)[:, Iall]
-    geom.mark = geom.mark[Iall]
-    # note, geom.Z is shorter than positions(geom) since continuum nodes are
-    # not included
-    Iat = setdiff(find(geom.mark .>= 0), idx)
-    geom.Z = geom.Z[:, Iat]
-    geom.nA = geom.nA - 1
-    # redo the triangulation
-    geom.tri = FEM.Triangulation(X)
-    return geom
+   if geom.mark[idx] != 0
+      error("remove_atom! : only allowed to remove core atoms")
+   end
+   Iall = setdiff(1:nX(geom), idx)
+   X = positions(geom)[:, Iall]
+   geom.mark = geom.mark[Iall]
+   # note, geom.Z is shorter than positions(geom) since continuum nodes are
+   # not included
+   Iat = setdiff(find(geom.mark .>= 0), idx)
+   geom.Z = geom.Z[:, Iat]
+   geom.nA = geom.nA - 1
+   # redo the triangulation
+   geom.tri = FEM.Triangulation(X)
+   return geom
 end
 
-# TODO: add_atom!
+
+"remove an atom from the geometry, usually to create a vacancy"
+function add_atom!(geom::Domain, x0::Vector)
+   Iall = setdiff(1:nX(geom), idx)
+   X = [positions(geom) x0]
+   geom.mark = [geom.mark; 0]
+   geom.nA = geom.nA + 1
+   # redo the triangulation
+   geom.tri = FEM.Triangulation(X)
+   return geom
+end
 
 
 import Compose.compose
