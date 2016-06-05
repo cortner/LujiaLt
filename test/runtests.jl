@@ -41,7 +41,7 @@ function test_Atm()
                                z->grad(model, z),
                                x + 0.03 * rand(x) )
    println("trying to optimise the geometry")
-   Ysol = LL.Solve.solve(model)
+   Ysol = LL.Solve.solve(model, display_result=true)
    #  LL.Solve.steepest_descent( obj = z->evaluate(model, z),
    #                     grad = z->grad(model, z),
    #                     x0 = x, alpha0 = 1e-2, maxnit = 100)
@@ -56,8 +56,8 @@ function test_solve()
    println("      TEST_SOLVE")
    println("==================================================================")
    println("Testing implementation of the solver interface")
-   model = Atm(V = ToyEAMPotential(), Ra=5.0, defect=:none)
-   Ysol = LL.Solve.solve(model, randomise = 0.01, display_result=true)
+   model = Atm(V = ToyEAMPotential(), Ra=5.1, defect=:none)
+   Ysol = LL.Solve.solve(model, randomise = 0.02, display_result=true)
 
    # x = LL.defm2dofs(model, model.Yref)
    # x += 0.02 * (rand(size(x)) - 0.5)
@@ -67,6 +67,7 @@ function test_solve()
 
    return vecnorm(Ysol - model.Yref, Inf) < 1e-4
 end
+
 
 #############################################################################
 

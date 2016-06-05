@@ -5,6 +5,8 @@ using Optim
 
 import LujiaLt: Model, free_defm_indices, defm2dofs, dofs2defm,
             grad, evaluate
+import LujiaLt.Potentials: nndist, rdim
+import LujiaLt.MDTools: NeighbourList, sites
 
 """
 `preconditioner(m::Model, Y::Matrix)`
@@ -16,27 +18,29 @@ Preconditioner for a standard model (where the dofs are the
 * m : model description (e.g., Atm)
 * Y : rdim x N matrix of (e.g.) positions
 """
-function preconditioner_scalar(m::Model, Y::Matrix)
+@noinline function preconditioner(m::Model, Y::Matrix)
    # get a nearest-neighbour list (+ a bit)
    rnn = nndist(m.V)
-   nlist = NeighbourList(X, 1.5 * rnn)
+   nlist = NeighbourList(Y, 1.5 * rnn)
    # allocate a triplet format
    I = Int[]; J = Int[]; Z = Float64[];
-   # loop through sites and neighbours
-   for (n, neigs, r, R) in sites(nlist)
-      for j in neigs
-         push!(I, n); push!(J, j); push!( Z, exp(-3.0*(r-rnn)) )
-      end
+   # loop through sites and neighbours: add interacting pairs to the matrix
+   for (n, neigs, r, R) in sites(nlist), (j, r) in zip(neigs, r)
+      z = exp(-3.0*(r-rnn))
+      push!(I, n); push!(J, j); push!(Z, -z)
+      push!(I, n); push!(J, n); push!(Z, z)
+      push!(I, j); push!(J, n); push!(Z, -z)
+      push!(I, n); push!(J, n); push!(Z, z)
    end
    # create sparse matrix and stabilise a bit
-   P = sparse(I, J, Z, size(Y,2), size(Y, 2)) + 0.01 * speye(size(Y,2))
+   P = sparse(I, J, Z, size(Y,2), size(Y, 2))
+   P += 0.01 * speye(size(Y,2))
    return kron(P, eye(rdim(m.V)))
 end
 
-function preconditioner(m::Model, dof::Vector)
-   P = preconditioner(m, dofs2defm(m, dof))[m.Ifree, m.Ifree]
+@noinline function preconditioner(m::Model, dof::Vector)
    J = free_defm_indices(m)
-   return P[J, J]
+   return preconditioner(m, dofs2defm(m, dof))[J, J]
 end
 
 
@@ -65,7 +69,7 @@ function solve(m::Model;
    end
    obj = x -> evaluate(m, x)
    obj1 = (x, out) -> copy!(out, grad(m, x))
-   P = nothing; # preconditioner(m, x0)
+   P = preconditioner(m, x0)
    result = Optim.optimize( DifferentiableFunction(obj, obj1), x0,
                               method = ConjugateGradient(P=P),
                               ftol=1e-32, grtol=tol )
