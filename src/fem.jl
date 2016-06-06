@@ -86,12 +86,15 @@ end
 
 type P1element
   t
-  vol
+  vol::Float64
   J
   B
   xT
   idx
 end
+
+Triangulation() = Triangulation(Matrix{Float64}(), Matrix{Int}(),
+                                 PyObject(nothing))
 
 function Triangulation(X)
     # reshape X
@@ -192,64 +195,6 @@ end
 
 
 
-
-# ########################## PLOTTING ############################
-
-
-function compose_elements(tri, elcol, linecol, lwidth, ub)
-   # draw the elements
-   points = Tuple{Float64, Float64}[]
-   for n = 1:nT(tri)
-      p = [tri.X[:, tri.T[:, n]] tri.X[:, tri.T[1,n]]]
-      for m = 1:size(p, 2)
-           push!(points, tuple(p[1, m], p[2,m]))
-      end
-      push!(points, tuple(NaN, NaN))
-   end
-   return compose(context(units=ub), polygon(points),
-                   fill(elcol), stroke(linecol), linewidth(lwidth) )
-end
-
-
-
-
-
-
-function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",
-                buffer=2*xradius, elcol = "aliceblue", linecol="darkblue",
-                lwidth=1.0, axis=:ignore)
-
-    if axis == :ignore
-        # create a canvas
-        xLim = [extrema(tri.X[1,:])...]
-        dat_width = xLim[2]-xLim[1]
-        yLim = [extrema(tri.X[2,:])...]
-        dat_height = yLim[2]-yLim[1]
-        xLim[1] -= buffer; xLim[2] += buffer; dat_width = xLim[2]-xLim[1]
-        yLim[1] -= buffer; yLim[2] += buffer; dat_height = yLim[2]-yLim[1]
-
-        if height == :auto
-            height = width * (dat_height / dat_width)
-        end
-        ub = UnitBox(xLim[1], yLim[1], dat_width, dat_height)
-    else
-        ub = UnitBox(axis[1], axis[2], axis[3], axis[4])
-    end
-
-    c_ctx = compose_elements(tri, elcol, linecol, lwidth, ub)
-
-    # draw the nodes
-    a_ctx = context(units=ub)
-    if xradius > 0
-        a_ctx = compose(a_ctx,
-                        circle(tri.X[1,:], tri.X[2,:], [xradius]),
-                        fill(atcol), stroke(linecol) )
-    end
-
-    ctx = compose(context(), a_ctx, c_ctx)
-    draw(SVG(width, height), ctx)
-    return ctx
-end
 
 
 

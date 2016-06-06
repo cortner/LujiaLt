@@ -55,10 +55,9 @@ ignored.
 
 """
 type Domain
-    # X::Matrix{Float64}
     Z::Matrix{Int32}
     mark::Vector{Int8}
-    A::Matrix{Float64}
+    A::Matrix{Float64}      # reference lattice matrix
     nA::Int
     tri::FEM.Triangulation
     info::Dict

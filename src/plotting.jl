@@ -5,14 +5,16 @@ using Compose, Colors
 
 import LujiaLt.Potentials: nndist
 import LujiaLt.MDTools: NeighbourList, uniquepairs
-import LujiaLt: Model, Atm, Domain, positions
+import LujiaLt: Model, Atm, Domain, positions, ACModel
+import LujiaLt.FEM: Triangulation, elements
 
-export plot 
+export plot
 
 const ljatcol = "tomato"
 const ljbondcol = "darkblue"
 const ljlinecol = "darkblue"
 const ljelcol = "aliceblue"
+
 
 "return a reasonable choice for the plotting axis"
 function autoaxis(X)
@@ -40,6 +42,7 @@ compose_atoms(X; radii=[0.2], lwidth=0.3, axis=autoaxis(X),
    ( context(axis), circle(X[1,:][:], X[2,:][:], radii),
      stroke(linecolor), linewidth(lwidth), fill(fillcolor) )
 
+nanvec(dim::Integer) = NaN * ones(dim)
 
 edges2path(X, B) = insert_nans( [X[:, B[1]]; X[:, B[2]]] )
 insert_nans(P) = reshape( [P; NaN * ones(2, size(P, 2))], 2, 3 * size(P, 2) )
@@ -54,51 +57,40 @@ function compose_bonds(X, B; lwidth=1.0, linecolor=ljbondcol,
    # P = reshape(P, dim, length(P) ÷ dim)
    # # convert into points
    # P = [ tuple(P[:, n]...) for n = 1:size(P, 2) ]
-   P = edges2path(X, B)
-   P = NTuple{2, Float64}[ tuple(P[:,n]...) for n = 1:size(P, 2) ]
+   dim = size(X,1)
+   P = Float64[]
+   for n = 1:length(B[1])
+      append!(P, [X[:, B[1][n]] X[:, B[2][n]] nanvec(dim) ][:])
+   end
+   P = mat2points(reshape(P, dim, length(P) ÷ dim))
    # return the required tuple to compose
    return ( context(axis), line(P), stroke(linecolor), linewidth(lwidth) )
 end
 
 
-
-# "create a context displaying circles for the positions given in `Y`"
-# function compose_atoms(X; radii=[0.2],
-#                        fillcolor=ljatcol, linecolor=ljbondcol, lwidth=0.3,
-#                        axis = autoaxis(X) )
-#     # make sure the radii are an array
-#     if length(radii) == 1
-#         radii = [radii...]
-#     end
-#
-#     # draw the nodes
-#     ctx = context(units = _ub_(axis) )
-#     ctx = compose( ctx, circle(X[1,:], X[2,:], radii),
-#                    fill(fillcolor), stroke(linecolor), linewidth(lwidth) )
-# end
+# ########################## PLOTTING ############################
 
 
-"create a context displaying the elements (triangles) defined"
-function compose_elements(X, T;
-                          fillcolor=ljelcol, linecolor=ljlinecol,
-                          lwidth=0.7, axis=autoaxis(X) )
-
-    points = NTuple{2, Float64}[]
-    for n = 1:size(T, 2)
-        p = [X[:, T[:, n]] X[:, T[1,n]]]
-        for m = 1:size(p, 2)
-            push!(points, (p[1, m], p[2,m]))
-        end
-        push!(points, (NaN, NaN))
-    end
-    ctx = compose(context(units=_ub_(axis)),
-                  polygon(points),
-                  fill(fillcolor), stroke(linecolor), linewidth(lwidth) )
-    return ctx
+function compose_elements(tri::Triangulation; X = tri.X, axis=autoaxis(X),
+                           elcol=ljelcol, linecol=ljbondcol, lwidth=0.5 )
+   dim = size(X, 1)
+   P = Float64[]
+   for el in elements(tri)
+      append!(P, [X[:, el.t] X[:, el.t[1]] nanvec(dim)][:])
+   end
+   P = mat2points( reshape(P, dim, length(P) ÷ dim) )
+   return ( context(axis), polygon(P), fill(elcol),
+            stroke(linecol), linewidth(lwidth) )
 end
+
+
+
+
+
 
 """
 `plot(at::Atm; kwargs...)`
+`plot(at::Triangulation; kwargs...)`
 
 ## Keyword arguments
 * X : positions (default, reference positions)
@@ -113,7 +105,33 @@ function plot( at::Atm; X=positions(at), axis = autoaxis(X),
    ctx = compose( context(axis),
                   compose_atoms( X, radii=[0.2], axis=axis ),
                   compose_bonds( X, (i, j), lwidth=0.7, axis=axis ) )
-   draw( SVG(plotwidth, relative_height(axis, plotwidth)), ctx )
+   draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
+   return nothing
+end
+
+
+function plot( tri::Triangulation; axis = autoaxis(tri.X),
+               plotwidth = 12cm, Img=SVG, elcol = ljelcol, linecol=ljbondcol,
+               lwidth=0.5 )
+   ctx = compose( context(axis),
+                  compose_elements(tri, elcol=elcol, linecol=linecol,
+                                    axis=axis, lwidth=lwidth ) )
+   draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
+   return nothing
+end
+
+
+# TODO: visualise the transition via adjusting the shades of the atoms and
+#       of the elements
+function plot( m::ACModel; X=positions(m), axis = autoaxis(X),
+               plotwidth = 12cm, Img=SVG, elcol = ljelcol, linecol=ljbondcol,
+               lwidth=0.5 )
+   Xat = X[:, find(m.volX .< 1.0)]
+   ctx = compose( context(axis),
+                  compose_atoms( Xat, radii=[0.2], axis=axis ),
+                  compose_elements( m.geom.tri, X=X, elcol=elcol, axis=axis,
+                                    linecol=linecol, lwidth=lwidth ) )
+   draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
    return nothing
 end
 

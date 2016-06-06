@@ -1,10 +1,15 @@
 
+
 import .Potentials: SitePotential, StandardSitePotential, rdim, cutoff
-using FEM
+import .FEM: Triangulation, elements
+
+export ACModel, BQCE, Atm, label
+
+abstract ACModel <: Model
+
 
 "return a string label that described the model"
 label{T <: Model}(::T) = error("no label defined for $T")
-export label
 
 ################### Some generic dof-conversion functions
 # any model that wants to use these must have the fields
@@ -67,6 +72,11 @@ end
 
 positions(m) = positions(m.geom)
 
+Aref(m::ACModel) = m.geom.A
+
+tight_buffer(V::SitePotential) = cutoff(V) + 0.1
+moderate_buffer(V::SitePotential) = 1.1*(0.3+cutoff(V))
+
 
 ##################### Basic Atomistic Model ###################################
 
@@ -88,15 +98,14 @@ type Atm{TV <: SitePotential} <: Model
    # ------ Atm specific fields: ----------
    vol::Vector{Float64}
 end
-export Atm
 
 # default constructor for Atm
-function Atm(; V=nothing, Ra=5.0, lattice=:triangular, defect=:none)
-   geom = Domain(;Ra=Ra+2*cutoff(V)+0.1, lattice=lattice, defect=defect)
+function Atm(; V=nothing, Ra=5.1, kwargs...)
+   geom = Domain(Ra = Ra + 2 * tight_buffer(V), kwargs...)
    r = dist(positions(geom))
    Ifree = find(r .< Ra)
    vol = zeros(nX(geom))
-   vol[find(r .< Ra+cutoff(V)+0.1)] = 1.0
+   vol[find(r .< Ra + tight_buffer(V))] = 1.0
    Yref = reference_configuration(geom, V)
    return Atm(geom, V, Ifree, Yref, vol)
 end
@@ -114,8 +123,6 @@ grad(m::Atm, dofs::Vector{Float64}) =
 
 
 ##################### General Cauchy--Born Material ###########################
-
-abstract ACModel <: Model
 
 """
 `getR_cb(Aref::Matrix, V::SitePotential)`
@@ -151,7 +158,7 @@ end
 
 "Cauchy-Born potential energy, as array of local contributions"
 function cb_energies(m::ACModel, Y)
-   Rcb = getRcb(m.Aref, m.V)
+   Rcb = getRcb(Aref(m), m.V)
    Ec = zeros(nT(m.geom.tri))
    for el in elements(tri)
       if vols[el.idx] > 0
@@ -164,12 +171,12 @@ end
 
 "compute energy difference between two states"
 cb_energy_diff(m::ACModel, Y) = cb_energy_diff(m::ACModel, Y, m.Yref)
-cb_energy_diff(m:ACModel, Y, Yref) =
+cb_energy_diff(m::ACModel, Y, Yref) =
                   sum_kbn( cb_energies(m, Y) - cb_energies(m, Yref) )
 
 "Cauchy--Born energy gradient"
 function cb_grad(m::ACModel, Y)
-   Rcb = getRcb(m.Aref, m.V)
+   Rcb = getRcb(Aref(m), m.V)
    dE = zeros(size(Y))
    for el in elements(tri)
       if vols[el.idx] > 0
@@ -182,7 +189,72 @@ end
 
 ##################### B-QCE Model ###################################
 
+type BQCE{TV}  <: ACModel
+   geom::Domain
+   V::TV
+   Ifree::Vector{Int}
+   Yref::Matrix{Float64}
+   # ------ BQCE specific fields: ----------
+   volX::Vector{Float64}   # volumes associated with atoms
+   volT::Vector{Float64}   # volumes associated with elements
+end
 
+
+"natural cubic spline on [0, 1]"
+cubicspline(t) = (t .>= 1.0) + (0.0 .< t .< 1.0) .* (3*t.^2 -2*t.^3)
+
+"standard radial blending function (cubic spline)"
+radial_blending(X, r0, r1; x0=zeros(size(X,1))) =
+   cubicspline( (dist(X .- x0) - r0) / (r1-r0) )[:]
+
+
+"""
+`BQCE(kwargs...)`
+
+initialise a BQCE model.
+
+* `V` : interatomic potential
+* `Ra` : inner atomistic radius
+* `Rb` : blending radius; note the blending width is approx. `Rb-Ra`
+* `Rc` : outer (continuum) domain radius
+* `lattice` : lattice type; see `?Domain`
+* `defect` : lattice defect; see `?Domain`
+"""
+function BQCE(; V=nothing, Ra=3.1, Rb=6.1, Rc=12.1, blending=:radial,
+                kwargs... )
+   # compute a "good" radius for the atomistic part of the Domain
+   Rab_buf = Rb + moderate_buffer(V)
+   @assert Rc > Rab_buf
+   # create the geometry
+   geom = Domain(Ra=Rab_buf, Rc=Rc, kwargs...)
+   Yref = reference_configuration(geom, V)
+   # free nodes
+   r = dist(positions(geom))
+   Ifree = find(r .< Rc-0.1)
+   # compute the blending
+   # TODO: implement a displatch mechanism for blending
+   @assert blending == :radial
+   volX = radial_blending(positions(geom), Ra, Rb)
+   # volX defines a blending function from which we can now
+   # compute the quadratue weights for the blended CB model
+   # NOTE: if we want to extend to P2-fem, then we need to
+   #       change this implementation quite a bit.
+   volT = Float64[el.vol/det(Atri)/3.0 * sum(volX[el.t])
+                                          for el in elements(geom.tri)]
+   # ready to complete the assembly
+   return BQCE(geom, V, Ifree, Yref, volX, volT)
+end
+
+label(::BQCE) = "BQCE"
+
+
+# evaluate the energy of the model
+evaluate(m::Atm, dofs::Vector{Float64}) =
+    at_energy_diff(m.V, dofs2defm(m, dofs), m.Yref, m.vol)
+
+# evaluate the gradient of the energy of this model
+grad(m::Atm, dofs::Vector{Float64}) =
+    frc2dofs(m, at_energy1(m.V, dofs2defm(m, dofs), m.vol))
 
 
 ##################### B-QCF Model ###################################

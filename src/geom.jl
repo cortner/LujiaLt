@@ -149,7 +149,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
     # create a Triangulation object without actual triangulation
     # the proper triangulation will be created after we add the defects
     X = reshape(X, 2, length(X) ÷ 2)
-    tri = FEM.Triangulation(X, Matrix{Int}(), PyObject(nothing))
+    tri = FEM.Triangulation()
 
     # create the reference domain
     geom = Domain(Z, mark, AA, nA, tri, Dict())
