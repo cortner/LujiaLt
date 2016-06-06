@@ -175,7 +175,7 @@ cb_energy_diff(m::ACModel, Y, Yref) =
                   sum_kbn( cb_energies(m, Y) - cb_energies(m, Yref) )
 
 "Cauchy--Born energy gradient"
-function cb_grad(m::ACModel, Y)
+function cb_energy1(m::ACModel, Y)
    Rcb = getRcb(Aref(m), m.V)
    dE = zeros(size(Y))
    for el in elements(tri)
@@ -234,13 +234,13 @@ function BQCE(; V=nothing, Ra=3.1, Rb=6.1, Rc=12.1, blending=:radial,
    # compute the blending
    # TODO: implement a displatch mechanism for blending
    @assert blending == :radial
-   volX = radial_blending(positions(geom), Ra, Rb)
+   volX = 1.0-radial_blending(positions(geom), Ra, Rb)
    # volX defines a blending function from which we can now
    # compute the quadratue weights for the blended CB model
    # NOTE: if we want to extend to P2-fem, then we need to
    #       change this implementation quite a bit.
-   volT = Float64[el.vol/det(Atri)/3.0 * sum(volX[el.t])
-                                          for el in elements(geom.tri)]
+   volT = Float64[ el.vol / det(Atri) * mean(1.0-volX[el.t])
+                   for el in elements(geom.tri) ]
    # ready to complete the assembly
    return BQCE(geom, V, Ifree, Yref, volX, volT)
 end
@@ -249,12 +249,14 @@ label(::BQCE) = "BQCE"
 
 
 # evaluate the energy of the model
-evaluate(m::Atm, dofs::Vector{Float64}) =
-    at_energy_diff(m.V, dofs2defm(m, dofs), m.Yref, m.vol)
+evaluate(m::BQCE, dofs::Vector{Float64}) = evaluate(m, dofs2defm(m, dofs))
+evaluate(m::BQCE, Y::Matrix{Float64}) =
+               at_energy_diff(m.V, Y, m.Yref, m.volX) + cb_energy_diff(m, Y)
 
 # evaluate the gradient of the energy of this model
-grad(m::Atm, dofs::Vector{Float64}) =
-    frc2dofs(m, at_energy1(m.V, dofs2defm(m, dofs), m.vol))
+grad(m::BQCE, Y::Matrix{Float64}) =
+      at_energy1(m.V, Y, m.volX) + cb_energy1(m, Y)
+grad(m::BQCE, dofs::Vector{Float64}) = frc2dofs(grad(m, dofs2defm(m, dofs)))
 
 
 ##################### B-QCF Model ###################################
