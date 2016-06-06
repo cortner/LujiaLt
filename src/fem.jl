@@ -43,13 +43,9 @@ using Compose
 
 @pyimport scipy.spatial as scipy_spatial
 
-export Triangulation
-export nT, nX
-export elements
-export locate
-export P1_element
+export Triangulation, locate, nT, nX
+export elements, P1_element, ∇u
 export plot
-
 
 
 """
@@ -134,6 +130,10 @@ Base.length(tri::Triangulation) = nT(tri)
 "compute the P1 gradient in the reference triangle"
 ref_grad(t::Vector{Int}, V::Matrix{Float64}) = V[:, t[2:3]] .- V[:, t[1]]
 
+
+∇u(el, U::Vector) = el.B' * U[el.t]
+∇u(el, U::Matrix) = U[:, el.t] * el.B
+
 """
 compute some information related to P1-FEM:
 
@@ -209,6 +209,10 @@ function compose_elements(tri, elcol, linecol, lwidth, ub)
    return compose(context(units=ub), polygon(points),
                    fill(elcol), stroke(linecol), linewidth(lwidth) )
 end
+
+
+
+
 
 
 function plot(tri; width=15cm, height=:auto, xradius=0.25, atcol="tomato",

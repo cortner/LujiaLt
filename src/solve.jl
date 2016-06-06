@@ -77,7 +77,7 @@ function solve(m::Model;
    P = preconditioner(m, x0)
    result = Optim.optimize( DifferentiableFunction(obj, obj1), x0,
                               method = Optimiser(P=P),
-                              ftol=0.0, grtol=tol )
+                              ftol=0.0, grtol=tol, iterations=20_000 )
    # TODO: analyse `result` more carefully
    if display_result
       println(result)
@@ -99,13 +99,13 @@ end
 
 
 
-function fzero(;obj=nothing, grad=nothing, x0=nothing,
-                  alpha0 = 1.0, tol = 1e-4, precon = 1.0,
-                  maxnit = 1_000, Carmijo = 0.2,
-                  displevel = 2, alpha_min = 1e-8)
-
-   # this will use
-end
+# function fzero(;obj=nothing, grad=nothing, x0=nothing,
+#                   alpha0 = 1.0, tol = 1e-4, precon = 1.0,
+#                   maxnit = 1_000, Carmijo = 0.2,
+#                   displevel = 2, alpha_min = 1e-8)
+#
+#    # this will use
+# end
 
 
 

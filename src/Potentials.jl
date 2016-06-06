@@ -22,7 +22,9 @@ abstract StandardSitePotential <: SitePotential
 "site potentials for anti-plane displacements"
 abstract AntiplaneSitePotential <: SitePotential
 
-
+# some auxiliary function to be called if only R is available but not r
+evaluate(V::SitePotential, R::Matrix) = evaluate(V, sqrt(sumabs2(R,1)), R)
+grad(V::SitePotential, R::Matrix) = grad(V, sqrt(sumabs2(R,1)), R)
 
 ########################## CUTOFF FUNCTION #################################
 

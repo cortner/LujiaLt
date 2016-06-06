@@ -1,15 +1,12 @@
 
-using Compose
-using PyCall
+# this is part of the main LujiaLt module
 
 export nX, positions, dist, remove_atom!
 
 
-#
 # here we collect some functions that generate and manipulate
 # simple lattice geometries, add defects, etc.
 # the `Domain` type is already defined in LujiaLt.jl
-#
 
 const Atri=[1.0 cos(pi/3); 0.0 sin(pi/3)]
 
@@ -18,15 +15,25 @@ Base.getindex(geom::Domain, idx) = geom.info[idx]
 Base.setindex!(geom::Domain, val, idx) = (geom.info[idx] = val)
 
 "auxiliary function ala meshgrid"
-twogrid{T}(x::Vector{T}, y::Vector{T}) =
-    (x .+ ones(T, length(y))', ones(T, length(x)) .+ y')
-# twogrid(x, y) = twogrid(collect(x), collect(y))
+meshgrid{T}(x::Vector{T}, y::Vector{T}) =
+   (x .+ ones(T, length(y))', ones(T, length(x)) .+ y')
 
 "turn 2grid into a list of points"
-function twogrid_list(x, y)
-    X, Y = twogrid(collect(x), collect(y))
-    return [X[:]'; Y[:]']
+function meshgrid_list(x, y)
+   X, Y = meshgrid(collect(x), collect(y))
+   return [X[:]'; Y[:]']
 end
+
+# "`dgrid(x, dim)` : another meshgrid like thing to replace meshgrid"
+# function dgrid{T}(x::Vector{T}, dim)
+#    o = ones(T, length(x))
+#    dim == 2 && return x .+ o', o .* x'
+#    dim == 3 && return kron(x, o, o), kron(o, x, o), kron(o, o, x)
+#    throw(ArgumentError("dgrid: dim must be 2, or 3."))
+# end
+#
+# "dgrid in a list of vectors form"
+# dgrid_list(x, dim) = vcat( [a[:]' for a in dgrid(x, dim)] )
 
 "compute distance of points from some point"
 dist(X, X0) = sqrt(sumabs2(X .- X0, 1));
@@ -39,7 +46,7 @@ function lattice_ball(;R=5.0, A=Atri, x0=[0.0;0.0])
     # coordinate direction
     sig = minimum(svd(A)[2])
     ndim = ceil(Int, (norm(x0)+R)/sig)
-    Z = twogrid_list(-ndim:ndim, -ndim:ndim)
+    Z = meshgrid_list(-ndim:ndim, -ndim:ndim)
     # convert to physical reference configuration
     X = A * Z
     # keep only the points inside R
