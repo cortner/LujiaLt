@@ -91,6 +91,9 @@ vector.
 abstract Model
 export Model
 
+abstract ACModel <: Model
+export ACModel
+
 
 # parts of main-module
 include("geom.jl")

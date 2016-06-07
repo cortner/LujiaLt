@@ -58,22 +58,35 @@ function test_solve()
    println("Testing implementation of the solver interface")
    model = Atm(V = ToyEAMPotential(), Ra=5.1, defect=:none)
    Ysol = LL.Solve.solve(model, randomise = 0.02, display_result=true)
-
-   # x = LL.defm2dofs(model, model.Yref)
-   # x += 0.02 * (rand(size(x)) - 0.5)
-   # LL.Solve.steepest_descent( obj = z->evaluate(model, z),
-   #                     grad = z->grad(model, z),
-   #                     x0 = x, alpha0 = 1e-2, maxnit = 100)
-
    return vecnorm(Ysol - model.Yref, Inf) < 1e-4
+end
+
+
+function test_bqce()
+   println()
+   println("==================================================================")
+   println("      TEST_BQCE")
+   println("==================================================================")
+   println("Testing implementation of the BQCE model")
+   model = BQCE(V = ToyEAMPotential(), Ra=3.1, Rb=5.1, Rc=10.1)
+   Y = model.Yref + 0.02*rand(size(model.Yref))
+   println("E = ", evaluate(model, Y))
+   println("|dE|_∞ = ", norm( grad(model, Y), Inf ) )
+   # println("check visually that the finite-difference test looks reasonable.")
+   # passed = LL.Testing.fdtest( z->evaluate(model, z),
+   #                             z->grad(model, z),
+   #                             x + 0.03 * rand(x) )
+   # println("trying to optimise the geometry")
+   # Ysol = LL.Solve.solve(model, display_result=true)
+   println("==================================================================")
+   return true
 end
 
 
 #############################################################################
 
-at = Atm(V=ToyEAMPotential(), Ra=4.1, defect=:interstitial)
-
 
 # @assert test_toyeam()
 # @assert test_Atm()
 # @assert test_solve()
+@assert test_bqce()

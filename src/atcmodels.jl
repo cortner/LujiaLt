@@ -1,11 +1,9 @@
 
 
-import .Potentials: SitePotential, StandardSitePotential, rdim, cutoff
+import .Potentials: SitePotential, StandardSitePotential, rdim, cutoff, nndist
 import .FEM: Triangulation, elements
 
-export ACModel, BQCE, Atm, label
-
-abstract ACModel <: Model
+export BQCE, Atm, label
 
 
 "return a string label that described the model"
@@ -120,71 +118,6 @@ evaluate(m::Atm, dofs::Vector{Float64}) =
 grad(m::Atm, dofs::Vector{Float64}) =
     frc2dofs(m, at_energy1(m.V, dofs2defm(m, dofs), m.vol))
 
-
-
-##################### General Cauchy--Born Material ###########################
-
-"""
-`getR_cb(Aref::Matrix, V::SitePotential)`
-
-get an interaction stencil to compute Wcb with; it takes a crude estimate
-on what is needed, using the assumptions (1) that interaction decays
-exponentially and (2) that for large atomistic region (i.e. high accuracy),
-the gradients will be close to reference.
-
-## Parameters
-
-* `Aref` : lattice matrix
-* `V` : interaction potential
-"""
-function getRcb(Aref::Matrix, V::SitePotential)
-   X, _ = lattice_ball(R = (nndist(V) + 0.7)*1.1, A=Aref)
-   return X[:, find(sumabs2(X, 1) .> 1e-10)]
-end
-
-
-"Cauchy-Born energy density"
-Wcb(F, V::SitePotential, R) = evaluate(V, F*R)
-
-"derivative of Cauchy--Born energy density"
-function Wcb1(F, V::SitePotential, R)
-   dV = grad(V, F*R)
-   dW = zeros(size(F))
-   for n = 1:size(R,2)
-      dW += dV[:, n] * R[:, n]'
-   end
-   return dW
-end
-
-"Cauchy-Born potential energy, as array of local contributions"
-function cb_energies(m::ACModel, Y)
-   Rcb = getRcb(Aref(m), m.V)
-   Ec = zeros(nT(m.geom.tri))
-   for el in elements(tri)
-      if vols[el.idx] > 0
-         F = ∇u(el, Y)
-         Ec[el.idx] = Wcb(F, m.V, Rcb)
-      end
-   end
-   return Ec
-end
-
-"compute energy difference between two states"
-cb_energy_diff(m::ACModel, Y) = cb_energy_diff(m::ACModel, Y, m.Yref)
-cb_energy_diff(m::ACModel, Y, Yref) =
-                  sum_kbn( cb_energies(m, Y) - cb_energies(m, Yref) )
-
-"Cauchy--Born energy gradient"
-function cb_energy1(m::ACModel, Y)
-   Rcb = getRcb(Aref(m), m.V)
-   dE = zeros(size(Y))
-   for el in elements(tri)
-      if vols[el.idx] > 0
-         dE[el.t] += vol[el.idx] * el.B * Wcb1(∇u(el, Y), m.V, Rcb)
-      end
-   end
-   return dE
-end
 
 
 ##################### B-QCE Model ###################################

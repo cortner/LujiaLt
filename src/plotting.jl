@@ -126,9 +126,9 @@ end
 function plot( m::ACModel; X=positions(m), axis = autoaxis(X),
                plotwidth = 12cm, Img=SVG, elcol = ljelcol, linecol=ljbondcol,
                lwidth=0.5 )
-   Xat = X[:, find(m.volX .< 1.0)]
+   Xat = X[:, find(m.volX .> 0.0)]
    ctx = compose( context(axis),
-                  compose_atoms( Xat, radii=[0.2], axis=axis ),
+                  compose_atoms( Xat, radii=[0.3], axis=axis ),
                   compose_elements( m.geom.tri, X=X, elcol=elcol, axis=axis,
                                     linecol=linecol, lwidth=lwidth ) )
    draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
