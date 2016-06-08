@@ -84,17 +84,35 @@ type Triangulation
     pyo::PyObject
 end
 
+"""
+`type P1element`
+
+returned during iterations with `elements(tri)`.
+
+## Fields
+
+* `t`: indices of vertices
+* `vol` : volume of element
+* `J` : jacobian matrix for coordinate transformation
+* `B` : P1 gradient operator: B * U = ∇u (see also `?∇u`)
+* `xT` : element mid-point
+* `idx` : element index; but note that `A[el.idx]` is equivalent to `A[el]`
+"""
 type P1element
-  t
+  t::Vector{Int}
   vol::Float64
-  J
-  B
-  xT
-  idx
+  J::Matrix{Float64}
+  B::Matrix{Float64}
+  xT::Vector{Float64}
+  idx::Int
 end
 
-Triangulation() = Triangulation(Matrix{Float64}(), Matrix{Int}(),
-                                 PyObject(nothing))
+# a cute getindex hack
+Base.getindex(coll::AbstractArray, el::P1element) = coll[el.idx]
+Base.setindex!(coll::AbstractArray, x, el::P1element) = (coll[el.idx] = x)
+
+# empty triangulation constructor
+Triangulation() = Triangulation(Matrix{Float64}(), Matrix{Int}(), PyObject(nothing))
 
 function Triangulation(X)
     # reshape X
@@ -133,9 +151,10 @@ Base.length(tri::Triangulation) = nT(tri)
 "compute the P1 gradient in the reference triangle"
 ref_grad(t::Vector{Int}, V::Matrix{Float64}) = V[:, t[2:3]] .- V[:, t[1]]
 
-
 ∇u(el, U::Vector) = el.B' * U[el.t]
 ∇u(el, U::Matrix) = U[:, el.t] * el.B
+
+stress2frc(el, T::Matrix) = T * el.B'
 
 """
 compute some information related to P1-FEM:
@@ -150,7 +169,7 @@ function P1element(idx::Int, tri::Triangulation)
    t = tri.T[:, idx]
    F = ref_grad(t, tri.X)
    return P1element( tri.T[:, idx], det(F) / 2, F,
-                      [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2), idx )
+                      [ -1 -1; 1 0; 0 1] / F, mean(tri.X[:, t], 2)[:], idx )
 end
 
 # function P1element(idx::Int, tri::Triangulation, U::Matrix{Float64})
@@ -192,42 +211,6 @@ function edges(tri::Triangulation)
     S = sort(S, 1)
     return unique(S, 2)
 end
-
-
-
-
-
-
-
-# import Compose.compose
-# """
-# visualise the domain and if passed deformation or displacement
-# """
-# function compose(geom::Domain;
-#                  Y=nothing, U=nothing,
-#                  axis=:auto, lwidth=:auto)
-#     if axis == :auto
-#         axis = Plotting.autoaxis(positions(geom))
-#     end
-#     if lwidth == :auto
-#         lwidth = 0.3
-#     end
-#     # plot core atomistic nodes
-#     ctx_atm = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .== 0)];
-#                                      axis=axis, fillcolor="tomato")
-#     # plot buffer nodes
-#     ctx_buf = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .> 0)];
-#                                      axis=axis,
-#                                      fillcolor="aliceblue",
-#                                      linecolor="darkblue" )
-#     # ctx_cb = Plotting.compose_atoms(positions(geom)[:, find(geom.mark .< 0)];
-#     #                                 axis=axis, fillcolor="aliceblue")
-#     # plot the finite element mesh (should we remove the inner triangles)?
-#     ctx_cb = Plotting.compose_elements(geom.tri.X, geom.tri.T;
-#                                        axis=axis, lwidth=lwidth)
-#     return Compose.compose( context(), ctx_atm, ctx_buf, ctx_cb )
-# end
-
 
 
 end # module FEM

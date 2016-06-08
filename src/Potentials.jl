@@ -23,8 +23,8 @@ abstract StandardSitePotential <: SitePotential
 abstract AntiplaneSitePotential <: SitePotential
 
 # some auxiliary function to be called if only R is available but not r
-evaluate(V::SitePotential, R::Matrix) = evaluate(V, sqrt(sumabs2(R,1)), R)
-grad(V::SitePotential, R::Matrix) = grad(V, sqrt(sumabs2(R,1)), R)
+evaluate(V::SitePotential, R::Matrix) = evaluate(V, sqrt(sumabs2(R,1)[:]), R)
+grad(V::SitePotential, R::Matrix) = grad(V, sqrt(sumabs2(R,1)[:]), R)
 
 ########################## CUTOFF FUNCTION #################################
 
@@ -87,11 +87,11 @@ end
 F(t) = 0.5 (t-psi0)^2 + C 0.25 (t-psi0)^4
 """
 type ToyEAMPotential <: StandardSitePotential
-    A
-    B
-    C
-    psi0
-    cutoff
+    A::Float64
+    B::Float64
+    C::Float64
+    psi0::Float64
+    cutoff::NTuple{2, Float64}
 end
 
 # default constructor
@@ -114,7 +114,7 @@ team_eldens(r, B, cutoff) = sum(exp(-B*(r-1)) .* fcut(r, cutoff))
 team_eldens1(r, R, B, cutoff) =
     R .* (exp(-B*(r-1)) .* (fcut1(r, cutoff) - B * fcut(r, cutoff)) ./ r)'
 
-evaluate(p::ToyEAMPotential, r, R) = (sum(morse(r, p.A, p.cutoff)) +
+evaluate(p::ToyEAMPotential, r, R) = (sum(morse(r, p.A, p.cutoff))  +
                team_embed( team_eldens(r, p.B, p.cutoff), p.C, p.psi0 ) )
 
 grad(p::ToyEAMPotential, r, R) = ( R .* (morse1(r, p.A, p.cutoff)./r)' +

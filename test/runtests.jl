@@ -68,19 +68,22 @@ function test_bqce()
    println("      TEST_BQCE")
    println("==================================================================")
    println("Testing implementation of the BQCE model")
-   model = BQCE(V = ToyEAMPotential(), Ra=3.1, Rb=5.1, Rc=10.1)
-   Y = model.Yref + 0.02*rand(size(model.Yref))
+   model = BQCE(V = ToyEAMPotential(), Ra=1.1, Rb=2.1, Rc=6.1)
+   println(" nX = ", length(find(model.volX .> 0)),
+            "; nT = ", length(find(model.volT .> 0)) )
+   Y = model.Yref + 0.01 * rand(size(model.Yref))
    println("E = ", evaluate(model, Y))
    println("|dE|_∞ = ", norm( grad(model, Y), Inf ) )
-   # println("check visually that the finite-difference test looks reasonable.")
-   # passed = LL.Testing.fdtest( z->evaluate(model, z),
-   #                             z->grad(model, z),
-   #                             x + 0.03 * rand(x) )
+   println("check visually that the finite-difference test looks reasonable.")
+   passed = LL.Testing.fdtest( z->evaluate(model, z),
+                               z->grad(model, z),
+                               Y )
    # println("trying to optimise the geometry")
    # Ysol = LL.Solve.solve(model, display_result=true)
    println("==================================================================")
    return true
 end
+
 
 
 #############################################################################
@@ -90,3 +93,19 @@ end
 # @assert test_Atm()
 # @assert test_solve()
 @assert test_bqce()
+
+
+# using Base.Profile, ProfileView
+
+# function test_cb_performance()
+#    model = BQCE(V = ToyEAMPotential(), Ra=1.1, Rb=3.1, Rc=8.1)
+#    Y = model.Yref + 0.01 * rand(size(model.Yref))
+#    model.volX[:] = 0.0
+#
+#    @time LujiaLt.cb_energies(model, Y)
+#    @time LujiaLt.cb_energies(model, Y)
+#    @time LujiaLt.cb_energies(model, Y)
+#    # ProfileView.view()
+# end
+#
+# test_cb_performance()

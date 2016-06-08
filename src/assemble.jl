@@ -1,8 +1,19 @@
 
 import .Potentials: SitePotential, cutoff, evaluate, grad
 import .MDTools: NeighbourList, sites
+import .FEM: nT, ∇u, stress2frc
 
 # export Model, Atm
+
+########################## some generic stuff #################################
+
+positions(m) = positions(m.geom)
+
+Aref(m::ACModel) = m.geom.A
+
+tight_buffer(V::SitePotential) = cutoff(V) + 0.1
+moderate_buffer(V::SitePotential) = 1.1*(0.3+cutoff(V))
+conservative_buffer(V::SitePotential) = (cutoff(V) + 0.7)*1.1
 
 
 ########################## atomistic assembly #################################
@@ -15,8 +26,9 @@ function at_energies(V::SitePotential, X::Matrix, vol)
     nlist = NeighbourList(X, cutoff(V))
     E = zeros(size(X, 2))
     for (n, neigs, r, R) in sites(nlist)
-        if vol[n] <= 0.0; continue; end    # skip vol-0 sites
-        E[n] = V(r, R)
+        if vol[n] > 0.0    # skip vol-0 sites
+           E[n] = evaluate(V, r, R)
+        end
     end
     return E
 end
@@ -48,7 +60,7 @@ function at_energy1(V::SitePotential, X::Matrix{Float64}, vol::Vector{Float64})
     dE = zeros(X)
     for (n, neigs, r, R) in sites(nlist)
         if vol[n] <= 0.0; continue; end
-        dV = grad(V, r, R)
+        dV = vol[n] * grad(V, r, R)
         dE[:, neigs] += dV
         dE[:, n] -= sum(dV, 2)
     end
@@ -77,7 +89,7 @@ the gradients will be close to reference.
 * `V` : interaction potential
 """
 function getRcb(Aref::Matrix, V::SitePotential)
- X, _ = lattice_ball(R = (nndist(V) + 0.7)*1.1, A=Aref)
+ X, _ = lattice_ball(R = conservative_buffer(V), A=Aref)
  return X[:, find(sumabs2(X, 1) .> 1e-10)]
 end
 
@@ -87,40 +99,52 @@ Wcb(F, V::SitePotential, R) = evaluate(V, F*R)
 
 "derivative of Cauchy--Born energy density"
 function Wcb1(F, V::SitePotential, R)
- dV = grad(V, F*R)
- dW = zeros(size(F))
- for n = 1:size(R,2)
-    dW += dV[:, n] * R[:, n]'
- end
- return dW
+   dV = grad(V, F*R)
+   dW = zeros(size(F))
+   for n = 1:size(R,2)
+      dW += dV[:, n] * R[:, n]'
+   end
+   return dW
 end
 
 "Cauchy-Born potential energy, as array of local contributions"
-function cb_energies(m::ACModel, Y)
- Rcb = getRcb(Aref(m), m.V)
- Ec = zeros(nT(m.geom.tri))
- for el in elements(tri)
-    if vols[el.idx] > 0
-       F = ∇u(el, Y)
-       Ec[el.idx] = Wcb(F, m.V, Rcb)
-    end
- end
- return Ec
+function cb_energies(m::ACModel, Y::Matrix, vols::Vector)
+   Rcb = getRcb(Aref(m), m.V)
+   Ec = zeros(nT(m.geom.tri))
+   for el in elements(m.geom.tri)
+      # if el.idx == 1
+      #    # @code_warntype ∇u(el, Y)
+      #    F = ∇u(el, Y)
+      #    FR = F * Rcb
+      #    r = sqrt(sumabs2(FR, 1))[:]
+      #    # @code_warntype Wcb(F, m.V, Rcb)
+      #    @code_warntype evaluate(m.V, r, FR)
+      #    error("stop")
+      # end
+      if vols[el] > 0
+         Ec[el] = Wcb(∇u(el, Y), m.V, Rcb)
+      end
+   end
+   return Ec
 end
+
+cb_energies(m::ACModel, Y::Matrix) = cb_energies(m, Y, m.volT)
 
 "compute energy difference between two states"
 cb_energy_diff(m::ACModel, Y) = cb_energy_diff(m::ACModel, Y, m.Yref)
 cb_energy_diff(m::ACModel, Y, Yref) =
-                sum_kbn( cb_energies(m, Y) - cb_energies(m, Yref) )
+                sum_kbn( m.volT .* (cb_energies(m, Y) - cb_energies(m, Yref)) )
 
 "Cauchy--Born energy gradient"
-function cb_energy1(m::ACModel, Y)
- Rcb = getRcb(Aref(m), m.V)
- dE = zeros(size(Y))
- for el in elements(tri)
-    if vols[el.idx] > 0
-       dE[el.t] += vol[el.idx] * el.B * Wcb1(∇u(el, Y), m.V, Rcb)
-    end
- end
- return dE
+function cb_energy1(m::ACModel, Y::Matrix, vols::Vector)
+   Rcb = getRcb(Aref(m), m.V)
+   dE = zeros(size(Y))
+   for el in elements(m.geom.tri)
+      if vols[el] > 0
+         dE[:, el.t] += vols[el] * stress2frc(el, Wcb1(∇u(el, Y), m.V, Rcb))
+      end
+   end
+   return dE
 end
+
+cb_energy1(m::ACModel, Y::Matrix) = cb_energy1(m, Y, m.volT)
