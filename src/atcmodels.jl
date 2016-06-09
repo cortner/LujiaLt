@@ -16,7 +16,7 @@ reference_configuration(geom, V)
 check that geom, V are compatible and if so, return a copy of the positions
 stored in geom to be stored as a reference configuration
 """
-function reference_configuration(geom::Domain, V::StandardSitePotential)
+function reference_configuration(geom::Domain, V::SitePotential)
     if rdim(V) != size(positions(geom), 1)
         error("reference_configuration : need rdim(V) == dDim(geom)!")
     end
@@ -47,8 +47,8 @@ type Atm{TV <: SitePotential} <: Model
 end
 
 # default constructor for Atm
-function Atm(; V=nothing, Ra=5.1, kwargs...)
-   geom = Domain(Ra = Ra + 2 * tight_buffer(V), kwargs...)
+function Atm(; V=nothing, Ra=5.1, defect=:none, lattice=:triangular)
+   geom = Domain(Ra = Ra + 2 * tight_buffer(V), defect=defect, lattice=lattice)
    r = dist(positions(geom))
    Ifree = find(r .< Ra)
    vol = zeros(nX(geom))
