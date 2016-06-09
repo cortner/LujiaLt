@@ -97,6 +97,9 @@ function radial_nodes(Rin, Rout;
 end
 
 
+# simple domain constructor, just passing positions
+Domain(X::Matrix{Float64}) = Domain(Matrix{Int}(), Vector{Int}(),
+                     Matrix{Float64}(), size(X,2), Triangulation(X), Dict())
 
 
 function Domain(; A=nothing, Ra=5.0, Rc=0.0,
@@ -150,6 +153,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
     # the proper triangulation will be created after we add the defects
     X = reshape(X, 2, length(X) ÷ 2)
     tri = FEM.Triangulation()
+    tri.X = X
 
     # create the reference domain
     geom = Domain(Z, mark, AA, nA, tri, Dict())

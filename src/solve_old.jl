@@ -1,6 +1,8 @@
 
 
 
+
+
 # steepest descent with quadratic line-search
 function steepest_descent(;obj=nothing, grad=nothing, x0=nothing,
                   alpha0 = 1.0, tol = 1e-4, precon = 1.0,
@@ -77,48 +79,62 @@ end
 
 
 
-# function ncg_force(; grad=nothing, x0=nothing, tol = 1e-4,
 
-#                    )
 
-# # basic static iteration with force-based (non-)linesearch?
+fxunction ncg_force(; grad=nothing, x0=nothing, tol = 1e-4,
+                     σ_0 = 1.0, maxnf = 1_000, alpha_min = 1e-8,
+                     σ0 = 0.1, P = 1.0, precondprep! = (P, x) -> P )
 
-# function ncg_force(; grad=nothing, x0=nothing,
-#                    alpha0 = 1.0, tol = 1e-4, precon = 1.0,
-#                    maxnf = 1_000, Carmijo = 0.2,
-#                    displevel = 2, alpha_min = 1e-8,
-#                    σ0 = 0.1)
+   nf = 0
+   k = 0
+   x = x0
+   r = - grad(x)
+   nf += 1
+   P = precondprep!(P, x)
+   s = similar(r)
+   A_ldiv_B!(s, P, r)
+   d = copy(s)
+   δ_new = dot(r, d)
+   δ_0 = δ_new
+   res_inf = norm(r, Inf)
+   while nf < maxnf && res_inf > tol
+      j = 0
+      δ_d = dot(d, r)
+      α = - σ_0    # σ_0 is undefined >>> input!
+      η_prev = dot( grad(x + σ_0 * d), d )
 
-#     # allocate some stuff
-#     N = length(x0)
-#     u = x0             # current state
-#     u_aux = copy(x0)
 
-#     # Evaluate first force and search direction
-#     F = grad(u)
-#     p = F
 
-#     # some initialisation
-#     δ_new = dot(F, p)
-#     δ0 = δ_new
-#     nf = 0
-#     res_inf = norm(F, Inf)
+   # allocate some stuff
+   N = length(x0)
+   u = x0             # current state
+   u_aux = copy(x0)
 
-#     while nf < maxnf && res_inf > tol
-#         # I have no idea what all this is ?!?!?
-#         sec_iter = 0
-#         δ = dot(p, p)    #delta_D = δ
-#         α = - σ0
-#         u_aux = u + σ0 * p
-#         F_new = grad(u_aux)
-#         η_prev = dot(F_new, p);
-#         η = dot(-F, p);
-#         α *= η / (η_prev - η)
-#         u += α * p
-#         η_prev = η
-#         sec_iter += 1
-#         #  Perform secant iteration loop
-#         while sec_iter < max_sec_iter && α^2 * δ > tol^2
+   # Evaluate first force and search direction
+   F = grad(u)
+   p = - F
+
+   # some initialisation
+   δ_new = dot(F, p)
+   δ0 = δ_new
+   nf = 0
+   res_inf = norm(F, Inf)
+
+   while nf < maxnf && res_inf > tol
+      # I have no idea what all this is ?!?!?
+      sec_iter = 0  # secant iterations?
+      δ = dot(p, p)    # delta_D = δ
+      α = - σ0
+      u_aux = u + σ0 * p
+      F_new = grad(u_aux)
+      η_prev = dot(F_new, p)
+      η = - dot(F, p)
+      α *= η / (η_prev - η)
+      u += α * p
+      η_prev = η
+      sec_iter += 1
+      #  Perform secant iteration loop
+      while sec_iter < max_sec_iter && α^2 * δ > tol^2
 #             F = grad(u)
 #             η = dot(F, p)
 #             α *= η / (η_prev - η)
@@ -175,3 +191,8 @@ end
 # # pause;
 
 # # end
+
+
+
+
+# include("solve_old.jl")

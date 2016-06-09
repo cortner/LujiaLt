@@ -57,6 +57,13 @@ function Atm(; V=nothing, Ra=5.1, kwargs...)
    return Atm(geom, V, Ifree, Yref, vol)
 end
 
+# alternative constructor passing X directly, this creates
+# a geom object without all the detailed information that the
+# "proper" construction provides
+Atm(X::Matrix{Float64}, Ifree::Vector{Int}, V::SitePotential) =
+   Atm(Domain(X), V, Ifree, X, ones(size(X,2)))
+
+
 label(::Atm) = "ATM"
 
 # evaluate the energy of the model

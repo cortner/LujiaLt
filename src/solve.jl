@@ -10,7 +10,6 @@ import LujiaLt.MDTools: NeighbourList, sites
 
 export solve
 
-
 """
 `preconditioner(m::Model, Y::Matrix)`
 `preconditioner(m::Model, dof::Vector)`
@@ -21,7 +20,7 @@ Preconditioner for a standard model (where the dofs are the
 * m : model description (e.g., Atm)
 * Y : rdim x N matrix of (e.g.) positions
 """
-@noinline function preconditioner(m::Model, Y::Matrix)
+function preconditioner(m::Model, Y::Matrix)
    # get a nearest-neighbour list (+ a bit)
    rnn = nndist(m.V)
    nlist = NeighbourList(Y, 1.5 * rnn)
@@ -30,18 +29,15 @@ Preconditioner for a standard model (where the dofs are the
    # loop through sites and neighbours: add interacting pairs to the matrix
    for (n, neigs, r, R) in sites(nlist), (j, r) in zip(neigs, r)
       z = exp(-3.0*(r-rnn))
-      push!(I, n); push!(J, j); push!(Z, -z)
-      push!(I, n); push!(J, n); push!(Z, z)
-      push!(I, j); push!(J, n); push!(Z, -z)
-      push!(I, n); push!(J, n); push!(Z, z)
+      append!(I, [n;n;j;j]); append!(J, [j;n;n;j]); append!(Z, [-z;z;-z;z])
    end
-   # create sparse matrix and stabilise a bit
+   # create sparse matrix and stabilise a little bit
    P = sparse(I, J, Z, size(Y,2), size(Y, 2))
    P += 0.01 * speye(size(Y,2))
    return kron(P, eye(rdim(m.V)))
 end
 
-@noinline function preconditioner(m::Model, dof::Vector)
+function preconditioner(m::Model, dof::Vector)
    J = free_defm_indices(m)
    return preconditioner(m, dofs2defm(m, dof))[J, J]
 end
@@ -61,7 +57,8 @@ function solve(m::Model;
                randomise = 0.0,
                tol = 1e-6,
                display_result = false,
-               Optimiser = ConjugateGradient )
+               Optimiser = ConjugateGradient,
+               show_trace=false)
    # this needs more boiler plate later on, but for now we can just
    # minimise
    #
@@ -76,8 +73,9 @@ function solve(m::Model;
    obj1 = (x, out) -> copy!(out, grad(m, x))
    P = preconditioner(m, x0)
    result = Optim.optimize( DifferentiableFunction(obj, obj1), x0,
-                              method = Optimiser(P=P),
-                              ftol=0.0, grtol=tol, iterations=20_000 )
+                              method = Optimiser(P=P), g_tol=tol,
+                              f_tol=0.0, iterations=1_000,
+                              show_trace=show_trace )
    # TODO: analyse `result` more carefully
    if display_result
       println(result)
@@ -109,12 +107,36 @@ end
 
 
 
-
-# TODO:
-#  * move everything to just using Optim.jl
-#  * implement CG solver from shewchuck; Matlab code copied below.
+end
 
 
-# include("solve_old.jl")
 
+"""
+`quick_solve(; kwargs...)`
+
+From supplied information, construct model, optimise, and return
+equilibrated positions.
+
+## Keyword arguments
+
+* `X` : d x Nat positions matrix
+* `Ifree` : list of free atom indices (rest are clamped)
+* `Rfree` : ignored if Ifree is provided; otherwise Rfree is the radius
+of free atoms
+* `V = LennardJonesPotential` : interaction potential
+"""
+function quick_solve( ; X=nothing, Rfree=nothing, Ifree=nothing,
+                        V=Potentials.LennardJonesPotential(),
+                        show_trace=false )
+   # construct free indices (if not supplied)
+   if Ifree == nothing
+      if Rfree == nothing
+         error("`quick_solve` needs either Ifree or Rfree")
+      end
+      Ifree = find( dist(X) .< Rfree )
+   end
+   # construct the atomistic model
+   model = Atm(X, Ifree, V)
+   # solve it
+   return Solve.solve(model, show_trace=show_trace)
 end

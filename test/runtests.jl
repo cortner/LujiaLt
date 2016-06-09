@@ -7,7 +7,6 @@ using LujiaLt.Potentials
 
 
 
-
 function test_toyeam()
     println()
     println("==================================================================")
@@ -16,10 +15,27 @@ function test_toyeam()
     println("Testing implementation of ToyEAMPotential, at_energy, at_energy1")
     println("check visually that the finite-difference test looks reasonable.")
     V = ToyEAMPotential(B=3.0, C=1.0)
-    geom = Domain(Ra=4.0, defect=:vacancy)
+    geom = Domain(Ra=4.1, defect=:vacancy)
     # perturbed configuration
     X = positions(geom)
     Y = X + 0.1 * rand(X)
+    passed = LL.Testing.fdtest(V, Y)
+    println("==================================================================")
+    return passed
+end
+
+
+function test_lennardjones()
+    println()
+    println("==================================================================")
+    println("      TEST_TOYEAM")
+    println("==================================================================")
+    println("Testing implementation of ToyEAMPotential, at_energy, at_energy1")
+    println("check visually that the finite-difference test looks reasonable.")
+    V = LennardJonesPotential()
+    geom = Domain(Ra=4.1, defect=:vacancy)
+    # perturbed configuration
+    Y = positions(geom); Y += 0.1 * rand(size(Y))
     passed = LL.Testing.fdtest(V, Y)
     println("==================================================================")
     return passed
@@ -86,26 +102,25 @@ end
 
 
 
+function test_quick_solve()
+   println()
+   println("==================================================================")
+   println("      TEST QUICK_SOLVE")
+   println("==================================================================")
+   X, _ = LL.lattice_ball(R = 5.1)
+   X = X[:, find( dist(X) .> 0.1 )]
+   Y = LL.quick_solve(X=X, Rfree=3.1)
+   return true
+end
+
+
 #############################################################################
 
 
 # @assert test_toyeam()
+# @assert test_lennardjones()
 # @assert test_Atm()
 # @assert test_solve()
-@assert test_bqce()
+# @assert test_bqce()
 
-
-# using Base.Profile, ProfileView
-
-# function test_cb_performance()
-#    model = BQCE(V = ToyEAMPotential(), Ra=1.1, Rb=3.1, Rc=8.1)
-#    Y = model.Yref + 0.01 * rand(size(model.Yref))
-#    model.volX[:] = 0.0
-#
-#    @time LujiaLt.cb_energies(model, Y)
-#    @time LujiaLt.cb_energies(model, Y)
-#    @time LujiaLt.cb_energies(model, Y)
-#    # ProfileView.view()
-# end
-#
-# test_cb_performance()
+@assert test_quick_solve()
