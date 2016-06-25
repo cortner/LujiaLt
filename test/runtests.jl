@@ -4,7 +4,7 @@
 
 using LujiaLt; LL=LujiaLt
 using LujiaLt.Potentials
-
+using LujiaLt.TightBinding
 
 
 function test_toyeam()
@@ -114,6 +114,13 @@ function test_quick_solve()
 end
 
 
+function test_tb()
+   X, _ = LL.lattice_ball(R = 5.1)
+   X += 0.1 * rand(size(X)
+   tbm = TBToyModel()
+   H = evaluate(tbm.H, X)
+end
+
 #############################################################################
 
 
@@ -122,5 +129,6 @@ end
 # @assert test_Atm()
 # @assert test_solve()
 # @assert test_bqce()
+# @assert test_quick_solve()
 
-@assert test_quick_solve()
+test_tb()

@@ -55,7 +55,7 @@ end
 """
 function solve(m::Model;
                randomise = 0.0,
-               tol = 1e-6,
+               tol = 1e-5,
                display_result = false,
                Optimiser = ConjugateGradient,
                show_trace=false)
@@ -82,7 +82,6 @@ function solve(m::Model;
    end
    return dofs2defm(m, result.minimum)
 end
-
 
 
 
@@ -127,7 +126,8 @@ of free atoms
 """
 function quick_solve( ; X=nothing, Rfree=nothing, Ifree=nothing,
                         V=Potentials.LennardJonesPotential(),
-                        show_trace=false )
+                        show_trace=false, display_result=true,
+                        Optimiser = ConjugateGradient, tol=1e-5 )
    # construct free indices (if not supplied)
    if Ifree == nothing
       if Rfree == nothing
@@ -138,5 +138,7 @@ function quick_solve( ; X=nothing, Rfree=nothing, Ifree=nothing,
    # construct the atomistic model
    model = Atm(X, Ifree, V)
    # solve it
-   return Solve.solve(model, show_trace=show_trace)
+   return Solve.solve(model, show_trace=show_trace,
+                     display_result=display_result,
+                     Optimiser = Optimiser, tol=tol)
 end

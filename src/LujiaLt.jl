@@ -5,14 +5,20 @@
 """
 module LujiaLt
 
+# prototypes >>> move to `prototypes.jl`
+function evaluate end
+function grad end
+
+include("utils.jl")
+
 # basic molecular dynamics stuff: in particular a neighbourlist
 include("mdtools.jl")
 
 # some simple mad-up interatomic potentials
 include("potentials.jl")
 import .Potentials.SitePotential
-# , evaluate, grad
-# export evaluate, grad
+
+include("tightbinding.jl")
 
 # some basic FEM methodology
 include("fem.jl")
