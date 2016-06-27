@@ -5,6 +5,8 @@
 """
 module LujiaLt
 
+export evaluate, grad
+
 # prototypes >>> move to `prototypes.jl`
 function evaluate end
 function grad end

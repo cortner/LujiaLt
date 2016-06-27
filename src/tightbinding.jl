@@ -4,14 +4,14 @@
 module TightBinding
 
 
-using LujiaLt.Potentials
+using LujiaLt.Potentials, LujiaLt.MDTools
 
 import LujiaLt.Potentials: fcut, fcut1, morse, morse1 # swcut, swcut1,
 import LujiaLt: ColumnIterator, columns, evaluate, grad
 
 export TBHamiltonian, TBToyHamiltonian, TBModel, TBToyModel
 
-export hop, hop1
+export tb_energies, tb_energy1, tb_energy_diff, tb_energy
 
 
 """
@@ -24,13 +24,13 @@ abstract TBHamiltonian
 Tight-binding in-plane toy-model. No on-site term, and hopping term is
 given by the morse potential.
 """
-type TBToyHamiltonian
+type TBToyHamiltonian <: TBHamiltonian
    A::Float64
    cutoff::NTuple{2, Float64}
 end
 
-hop(r, H::TBToyHamiltonian) = morse(r, H.A, H.cutoff)
-hop1(r, H::TBToyHamiltonian) = morse1(r, H.A, H.cutoff)
+hop(H::TBToyHamiltonian, r) = morse(r, H.A, H.cutoff)
+hop1(H::TBToyHamiltonian, r) = morse1(r, H.A, H.cutoff)
 cutoff(H::TBToyHamiltonian) = H.cutoff[2]
 
 type TBModel{TH <: TBHamiltonian}
@@ -46,36 +46,42 @@ TBToyModel(; A=3.0, cutoff=(1.5, 2.3), beta = 0.1, mu = 0.0 ) =
    TBModel( TBToyHamiltonian(A, cutoff), mu, beta )
 
 
-function evaluate( H::TBHamiltonian, X::Matrix{Float64} )
+function evaluate( Ham::TBHamiltonian, X::Matrix{Float64} )
    d, N = size(X)
-   nlist = NeighbourList(X, cutoff(H))
+   nlist = NeighbourList(X, cutoff(Ham))
    H = zeros(N, N)
    for (i, j, r) in zip(nlist.i, nlist.j, nlist.r)
-      H[i,j] = hop(r, H)
+      R = X[:,j]-X[:,i]
+      r = norm(R)
+      H[i,j] = hop(Ham, r) * sign(r)   # TODO: remove sign
    end
    return H
 end
 
 
-function grad( H::TBHamiltonian, X::Matrix{Float64} )
-   d, N = size(X)
-   nlist = NeighbourList(X, cutoff(H))
-   dH = zeros(d, N, N)
-   nlR = reinterpret(nlist.R, )
-   for (i, j, r, R) in zip(nlist.i, nlist.j, nlist.r, columns(nlist.R))
-      dH[:,i,j] = (hop1(r, H)/r) * R
-   end
-   return dH
-end
+# function grad( Ham::TBHamiltonian, X::Matrix{Float64} )
+#    d, N = size(X)
+#    nlist = NeighbourList(X, cutoff(Ham))
+#    dH = zeros(d, N, N)
+#    nlR = reinterpret(nlist.R, )
+#    for (i, j, r, R) in zip(nlist.i, nlist.j, nlist.r, columns(nlist.R))
+#       dH[:,i,j] = (hop1(Ham, r)/r) * R
+#    end
+#    return dH
+# end
 
-function eval_and_grad( H::TBHamiltonian, X::Matrix{Float64} )
+function eval_and_grad( Ham::TBHamiltonian, X::Matrix{Float64} )
    d, N = size(X)
-   nlist = NeighbourList(X, cutoff(H))
+   nlist = NeighbourList(X, cutoff(Ham))
    H = zeros(N, N)
    dH = zeros(d, N, N)
    for (i, j, r, R) in zip(nlist.i, nlist.j, nlist.r, columns(nlist.R))
-      H[i,j] = hop(r, H)
-      dH[:,i,j] = (hop1(r, H)/r) * R
+      R = X[:,j]-X[:,i]
+      r = norm(R)
+      H[i,j] = hop(Ham, r) * sign(r)
+      for a = 1:d
+         dH[a,i,j] = hop1(Ham, r) * R[a]* (sign(r) / (r+eps()))
+      end
    end
    return H, dH
 end
@@ -85,23 +91,26 @@ end
 helper function to compute eigenvalues, then sort them
 """
 function sorted_eig(H)
-    @assert any(isnan(H)) || any(isinf(H))
+    @assert !(any(isnan(H)) || any(isinf(H)))
     epsn, C = eig(Symmetric(H))
     Isort = sortperm(epsn)
     return epsn[Isort], C[:, Isort]
 end
 
+"fermi-dirac base function"
+fd(e) = 1.0 ./ (1.0 + exp(e))
+"derivative of `fd`"
+fd1(e) = -exp(e) ./ (1.0+exp(e)).^2
+
 """
 Fermi-Dirac distribution function
 """
-fermidirac( tbm::TBModel, epsn ) = 1.0 ./ (1.0 + exp(tbm.beta * (epsn-tbm.mu)))
+fermidirac( tbm::TBModel, epsn ) = fd( tbm.beta * (epsn - tbm.mu) )
 
 """
 derivative of `fermidirac`
 """
-fermidirac1( tbm::TBModel, epsn ) =
-      - (2.0 * tbm.beta) ./ (1.0 + exp(tbm.beta * (epsn-tbm.mu))).^2 .*
-      exp(tbm.beta * (epsn-tbm.mu))
+fermidirac1( tbm::TBModel, epsn ) = tbm.beta * fd1( tbm.beta * (epsn - tbm.mu) )
 
 """
 tight-binding site-energies
@@ -119,10 +128,24 @@ end
 
 
 """
+tight-binding total potential energy
+"""
+tb_energy( tbm::TBModel, X ) = sum_kbn(tb_energies(tbm, X))
+######### NOTE: sum(siteenergies) is an unusual way to implement this
+#########       for reference here is the more traditional way:
+# function
+#    H = evaluate(tbm.H, X)
+#    epsn, C = sorted_eig(H)
+#    return sum_kbn(epsn .* fermidirac( tbm, epsn ))
+# end
+
+
+
+"""
 tight-binding energy-difference
 """
 tb_energy_diff( tbm::TBModel, X, Xref, vol ) =
-   kbn_sum( (tb_energies( tbm, X ) - tb_energies( tbm, Xref ) ) .* vol )
+   sum_kbn( (tb_energies( tbm, X ) - tb_energies( tbm, Xref ) ) .* vol )
 
 tb_energy_diff( tbm::TBModel, X, Xref ) =
    tb_energy_diff( tbm, X, Xref, ones(size(X,2)) )
@@ -132,15 +155,16 @@ tb_energy_diff( tbm::TBModel, X, Xref ) =
 tight-binding gradient / neg. forces
 """
 function tb_energy1(tbm::TBModel, X::Matrix{Float64})
+   d, N = size(X)
    H, dH = eval_and_grad(tbm.H, X)
    epsn, C = sorted_eig(H)
    # derivative of ϵ_s f_s
    f = fermidirac( tbm, epsn )
    df = fermidirac1( tbm, epsn )
-   dg = f + epsn .* df
+   dg = - 2.0 * (f + epsn .* df)
    # forces
-   dE = 2.0 * Float64[ dot( dg, C[i,:][:] .* (C' * dH[a,i,:][:]) )
-                      for a = 1:d, i = 1:N ]
+   dE = Float64[ dot( dg, C[i,:][:] .* (C' * dH[a,i,:][:]) )
+                 for a = 1:d, i = 1:N ]
    return dE
 end
 
@@ -148,6 +172,8 @@ end
 """
 return the density matrix (this is a very inefficient, and possibly
    numerically unstable implementation)
+
+TODO: this still needs to be tested!
 """
 function density_matrix( tbm::TBModel, X::Matrix{Float64} )
    H = evaluate(tbm.H, X)
@@ -162,7 +188,7 @@ function density_matrix( tbm::TBModel, X::Matrix{Float64} )
 end
 
 
-tb_site_energy1( tbm::TBModel, X::Matrix{Float64}, I::Int ) =
+tb_site_energy( tbm::TBModel, X::Matrix{Float64}, I::Int ) =
       tb_site_energy( tbm, X, [I;] )
 
 

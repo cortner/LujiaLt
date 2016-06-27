@@ -7,6 +7,8 @@ using LujiaLt.Potentials
 using LujiaLt.TightBinding
 
 
+
+
 function test_toyeam()
     println()
     println("==================================================================")
@@ -114,12 +116,41 @@ function test_quick_solve()
 end
 
 
+import LujiaLt.TightBinding: hop, hop1
+
+
 function test_tb()
-   X, _ = LL.lattice_ball(R = 5.1)
-   X += 0.1 * rand(size(X)
+   X, _ = LL.lattice_ball(R = 3.1)
+   Y = X + 0.1 * rand(size(X))
    tbm = TBToyModel()
-   H = evaluate(tbm.H, X)
+
+   # LL.Testing.fdtest(e -> LL.TightBinding.fermidirac(tbm, e[1]),
+   #                   e -> [LL.TightBinding.fermidirac1(tbm, e[1]);],
+   #                   rand(1) )
+   # println("testing hopping function")
+   # LL.Testing.fdtest(r -> hop(tbm.H, r)[1],
+   #                   r -> [hop1(tbm.H, r);],
+   #                   1.0 + 0.1 * rand(1) )
+   # println("testing Hamiltonian entry")
+   # LL.Testing.fdtest(R -> hop(tbm.H, norm(R)),
+   #                   R -> hop1(tbm.H, norm(R))/norm(R)*R,
+   #                   [0.8;0.55] + 0.1*rand() )
+
+   passedfd = LL.Testing.fdtest( z->tb_energy(tbm, z),
+                               z->tb_energy1(tbm, z),
+                               Y )
+   # site energies test
+   println("Testing site energies . . .")
+   @assert abs( sum(tb_energies(tbm, Y)) - tb_energy(tbm, Y) ) < 1e-12
+   # energy difference test:
+   println("Testing energy-difference . . .")
+   @assert abs( (tb_energy(tbm, Y) - tb_energy(tbm, X)) -
+               tb_energy_diff(tbm, Y, X) ) < 1e-12
+
+   return passedfd
 end
+
+
 
 #############################################################################
 
@@ -130,5 +161,4 @@ end
 # @assert test_solve()
 # @assert test_bqce()
 # @assert test_quick_solve()
-
-test_tb()
+@assert test_tb()
