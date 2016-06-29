@@ -113,9 +113,6 @@ export QModel
 # parts of main-module
 include("geom.jl")
 
-# some fun macros for a nicer notation
-include("callmagic.jl")
-
 # dof-handling
 include("dofs.jl")
 
