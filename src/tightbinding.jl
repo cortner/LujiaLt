@@ -9,7 +9,7 @@ using LujiaLt.Potentials, LujiaLt.MDTools
 import LujiaLt.Potentials: fcut, fcut1, morse, morse1 # swcut, swcut1,
 import LujiaLt: ColumnIterator, columns, evaluate, grad
 
-export TBHamiltonian, TBToyHamiltonian, TBModel, TBToyModel
+export TBHamiltonian, TBMorseHamiltonian, TBPotential, TBMorsePotential
 
 export tb_energies, tb_energy1, tb_energy_diff, tb_energy
 
@@ -24,16 +24,16 @@ abstract TBHamiltonian
 Tight-binding in-plane toy-model. No on-site term, and hopping term is
 given by the morse potential.
 """
-type TBToyHamiltonian <: TBHamiltonian
+type TBMorseHamiltonian <: TBHamiltonian
    A::Float64
    cutoff::NTuple{2, Float64}
 end
 
-hop(H::TBToyHamiltonian, r) = morse(r, H.A, H.cutoff)
-hop1(H::TBToyHamiltonian, r) = morse1(r, H.A, H.cutoff)
-cutoff(H::TBToyHamiltonian) = H.cutoff[2]
+hop(H::TBMorseHamiltonian, r) = morse(r, H.A, H.cutoff)
+hop1(H::TBMorseHamiltonian, r) = morse1(r, H.A, H.cutoff)
+cutoff(H::TBMorseHamiltonian) = H.cutoff[2]
 
-type TBModel{TH <: TBHamiltonian}
+type TBPotential{TH <: TBHamiltonian}
    H::TH   # hamiltonian
    mu::Float64      # chemical potential
    beta::Float64    # temperature / smearing parameter
@@ -42,8 +42,8 @@ type TBModel{TH <: TBHamiltonian}
 end
 
 
-TBToyModel(; A=3.0, cutoff=(1.5, 2.3), beta = 0.1, mu = 0.0 ) =
-   TBModel( TBToyHamiltonian(A, cutoff), mu, beta )
+TBMorsePotential(; A=3.0, cutoff=(1.5, 2.3), beta = 0.1, mu = 0.0 ) =
+   TBPotential( TBMorseHamiltonian(A, cutoff), mu, beta )
 
 
 function evaluate( Ham::TBHamiltonian, X::Matrix{Float64} )
@@ -53,7 +53,7 @@ function evaluate( Ham::TBHamiltonian, X::Matrix{Float64} )
    for (i, j, r) in zip(nlist.i, nlist.j, nlist.r)
       R = X[:,j]-X[:,i]
       r = norm(R)
-      H[i,j] = hop(Ham, r) * sign(r)   # TODO: remove sign
+      H[i,j] = hop(Ham, r)
    end
    return H
 end
@@ -76,12 +76,10 @@ function eval_and_grad( Ham::TBHamiltonian, X::Matrix{Float64} )
    H = zeros(N, N)
    dH = zeros(d, N, N)
    for (i, j, r, R) in zip(nlist.i, nlist.j, nlist.r, columns(nlist.R))
-      R = X[:,j]-X[:,i]
-      r = norm(R)
-      H[i,j] = hop(Ham, r) * sign(r)
-      for a = 1:d
-         dH[a,i,j] = hop1(Ham, r) * R[a]* (sign(r) / (r+eps()))
-      end
+      # R = X[:,j]-X[:,i]
+      # r = norm(R)
+      H[i,j] = hop(Ham, r)
+      dH[:,i,j] = (hop1(Ham, r)/r) * R
    end
    return H, dH
 end
@@ -105,17 +103,17 @@ fd1(e) = -exp(e) ./ (1.0+exp(e)).^2
 """
 Fermi-Dirac distribution function
 """
-fermidirac( tbm::TBModel, epsn ) = fd( tbm.beta * (epsn - tbm.mu) )
+fermidirac( tbm::TBPotential, epsn ) = fd( tbm.beta * (epsn - tbm.mu) )
 
 """
 derivative of `fermidirac`
 """
-fermidirac1( tbm::TBModel, epsn ) = tbm.beta * fd1( tbm.beta * (epsn - tbm.mu) )
+fermidirac1( tbm::TBPotential, epsn ) = tbm.beta * fd1( tbm.beta * (epsn - tbm.mu) )
 
 """
 tight-binding site-energies
 """
-function tb_energies( tbm::TBModel, X::Matrix{Float64} )
+function tb_energies( tbm::TBPotential, X::Matrix{Float64} )
    H = evaluate(tbm.H, X)
    epsn, C = sorted_eig(H)
    f = fermidirac( tbm, epsn )
@@ -130,7 +128,7 @@ end
 """
 tight-binding total potential energy
 """
-tb_energy( tbm::TBModel, X ) = sum_kbn(tb_energies(tbm, X))
+tb_energy( tbm::TBPotential, X ) = sum_kbn(tb_energies(tbm, X))
 ######### NOTE: sum(siteenergies) is an unusual way to implement this
 #########       for reference here is the more traditional way:
 # function
@@ -144,17 +142,17 @@ tb_energy( tbm::TBModel, X ) = sum_kbn(tb_energies(tbm, X))
 """
 tight-binding energy-difference
 """
-tb_energy_diff( tbm::TBModel, X, Xref, vol ) =
+tb_energy_diff( tbm::TBPotential, X, Xref, vol ) =
    sum_kbn( (tb_energies( tbm, X ) - tb_energies( tbm, Xref ) ) .* vol )
 
-tb_energy_diff( tbm::TBModel, X, Xref ) =
+tb_energy_diff( tbm::TBPotential, X, Xref ) =
    tb_energy_diff( tbm, X, Xref, ones(size(X,2)) )
 
 
 """
 tight-binding gradient / neg. forces
 """
-function tb_energy1(tbm::TBModel, X::Matrix{Float64})
+function tb_energy1(tbm::TBPotential, X::Matrix{Float64})
    d, N = size(X)
    H, dH = eval_and_grad(tbm.H, X)
    epsn, C = sorted_eig(H)
@@ -169,13 +167,17 @@ function tb_energy1(tbm::TBModel, X::Matrix{Float64})
 end
 
 
+
+######### TODO: the rest of this still needs to be tested! #############
+
+
 """
 return the density matrix (this is a very inefficient, and possibly
    numerically unstable implementation)
 
 TODO: this still needs to be tested!
 """
-function density_matrix( tbm::TBModel, X::Matrix{Float64} )
+function density_matrix( tbm::TBPotential, X::Matrix{Float64} )
    H = evaluate(tbm.H, X)
    epsn, C = sorted_eig(H)
    f = fermidirac( tbm, epsn )
@@ -188,16 +190,16 @@ function density_matrix( tbm::TBModel, X::Matrix{Float64} )
 end
 
 
-tb_site_energy( tbm::TBModel, X::Matrix{Float64}, I::Int ) =
+tb_site_energy( tbm::TBPotential, X::Matrix{Float64}, I::Int ) =
       tb_site_energy( tbm, X, [I;] )
 
 
 """
-`tb_site_energy1( tbm::TBModel, X::Matrix{Float64}, I::Vector{Int} )`
+`tb_site_energy1( tbm::TBPotential, X::Matrix{Float64}, I::Vector{Int} )`
 
 This is the efficient implementation of the TB site energy derivative.
 """
-function tb_site_energy1( tbm::TBModel, X::Matrix{Float64}, I::Vector{Int} )
+function tb_site_energy1( tbm::TBPotential, X::Matrix{Float64}, I::Vector{Int} )
 
    # preparations
    H, dH = eval_and_grad(tbm.H, X)
