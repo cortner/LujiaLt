@@ -7,7 +7,8 @@ module TightBinding
 using LujiaLt.Potentials, LujiaLt.MDTools
 
 import LujiaLt.Potentials: fcut, fcut1, morse, morse1 # swcut, swcut1,
-import LujiaLt: ColumnIterator, columns, evaluate, grad
+import LujiaLt: ColumnIterator, columns, evaluate, grad,
+                  reference_configuration, nndist, rdim
 
 export TBHamiltonian, TBMorseHamiltonian, TBPotential, TBMorsePotential
 
@@ -41,10 +42,17 @@ type TBPotential{TH <: TBHamiltonian}
    # f1::Function     #     ... and its derivative
 end
 
+typealias TBMorsePotential TBPotential{TBMorseHamiltonian}
 
 TBMorsePotential(; A=3.0, cutoff=(1.5, 2.3), beta = 0.1, mu = 0.0 ) =
    TBPotential( TBMorseHamiltonian(A, cutoff), mu, beta )
 
+nndist(::TBMorsePotential) = 1.0
+rdim(::TBMorsePotential) = 2
+
+# this is an in-plane model, so just return a copy of the lattice sites
+reference_configuration(Xref::Matrix{Float64},
+                        p::TBMorsePotential) = copy(Xref)
 
 function evaluate( Ham::TBHamiltonian, X::Matrix{Float64} )
    d, N = size(X)

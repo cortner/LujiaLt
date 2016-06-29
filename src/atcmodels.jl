@@ -24,6 +24,9 @@ function reference_configuration(geom::Domain, V::SitePotential)
 end
 
 
+nndist(m::Model) = nndist(m.V)
+rdim(m::Model) = rdim(m.V)
+nX(m::ACModel) = nX(m.geom)
 
 ##################### Basic Atomistic Model ###################################
 
@@ -37,7 +40,7 @@ Atomistic (classical potential) cluster model
 * Ra : core region radius of free atoms (buffer is added automatically)
 * See `?Domain` for `lattice` and `defect` parameters.
 """
-type Atm{TV <: SitePotential} <: Model
+type Atm{TV <: SitePotential} <: ACModel
    geom::Domain
    V::TV
    Ifree::Vector{Int}
@@ -146,6 +149,8 @@ evaluate(m::BQCE, Y::Matrix{Float64}) =
 grad(m::BQCE, Y::Matrix{Float64}) =
       at_energy1(m.V, Y, m.volX) + cb_energy1(m, Y)
 grad(m::BQCE, dofs::Vector{Float64}) = frc2dofs(grad(m, dofs2defm(m, dofs)))
+
+
 
 
 ##################### B-QCF Model ###################################

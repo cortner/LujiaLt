@@ -4,9 +4,9 @@ module Potentials
 export SitePotential, StandardSitePotential, PairPotential
 export ToyEAMPotential, LennardJonesPotential
 # export fcut, fcut1, swcut, swcut1
-export rdim, nndist, cutoff
+export cutoff
 
-import LujiaLt: evaluate, grad
+import LujiaLt: evaluate, grad, rdim, nndist
 
 
 """

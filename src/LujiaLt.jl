@@ -7,9 +7,13 @@ module LujiaLt
 
 export evaluate, grad
 
-# prototypes >>> move to `prototypes.jl`
+# TODO: prototypes >>> move to `prototypes.jl` or similar
 function evaluate end
 function grad end
+function nndist end
+function rdim end
+function reference_configuration end
+function nX end
 
 include("utils.jl")
 
@@ -74,7 +78,7 @@ export Domain
 
 
 """
-A `AbstractModel` is a complete description of the computational task, including
+A `Model` is a complete description of the computational task, including
 the interatomic potential (SitePotential or TB-Hamiltonian), the geometry
 (Domain) whether it is fully atomistic, a/c, qm/mm, etc. The following models
 have been implemented:
@@ -102,6 +106,9 @@ export Model
 abstract ACModel <: Model
 export ACModel
 
+abstract QModel <: Model
+export QModel
+
 
 # parts of main-module
 include("geom.jl")
@@ -117,6 +124,9 @@ include("assemble.jl")
 
 # concrete implementations of `Model` of a/c type
 include("atcmodels.jl")
+
+# implementations of TBModel, EnHybridModel, FrcHybridModel
+include("qmmodels.jl")
 
 # interface to nonlinear solvers
 include("solve.jl")

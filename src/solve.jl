@@ -22,19 +22,21 @@ Preconditioner for a standard model (where the dofs are the
 """
 function preconditioner(m::Model, Y::Matrix)
    # get a nearest-neighbour list (+ a bit)
-   rnn = nndist(m.V)
+   rnn = nndist(m)
    nlist = NeighbourList(Y, 1.5 * rnn)
    # allocate a triplet format
    I = Int[]; J = Int[]; Z = Float64[];
    # loop through sites and neighbours: add interacting pairs to the matrix
    for (n, neigs, r, R) in sites(nlist), (j, r) in zip(neigs, r)
-      z = exp(-3.0*(r-rnn))
-      append!(I, [n;n;j;j]); append!(J, [j;n;n;j]); append!(Z, [-z;z;-z;z])
+      z = exp(-3.0*(r/rnn-1.0))
+      append!(I, [n;n;j;j]);
+      append!(J, [j;n;n;j]);
+      append!(Z, [-z;z;-z;z])
    end
    # create sparse matrix and stabilise a little bit
    P = sparse(I, J, Z, size(Y,2), size(Y, 2))
    P += 0.01 * speye(size(Y,2))
-   return kron(P, eye(rdim(m.V)))
+   return kron(P, eye(rdim(m)))
 end
 
 function preconditioner(m::Model, dof::Vector)
@@ -63,7 +65,9 @@ function solve(m::Model;
    # minimise
    #
    # TODO: depending on the model call a minimise function
-   #       of an fzero function
+   #       or an fzero function
+   #
+   # TODO: replace m.Yref with reference_configuration ???
    #
    x0 = defm2dofs(m, copy(m.Yref))
    if randomise > 0
