@@ -32,6 +32,7 @@ include("fem.jl")
 
 # this type is not in geom.jl because Plotting depends on it
 # while geom again depends on Plotting.
+# TODO: can it now be moved back into geom.jl?
 """Basic Lujia-Lt geometry type
 * `X` : physical reference coordinates (both atomistic and FEM)
 * `Z` : lattice index (integer) reference coordinates
@@ -109,6 +110,8 @@ export ACModel
 abstract QModel <: Model
 export QModel
 
+abstract HybridModel <: QModel
+export HybridModel
 
 # parts of main-module
 include("geom.jl")
@@ -121,6 +124,9 @@ include("assemble.jl")
 
 # concrete implementations of `Model` of a/c type
 include("atcmodels.jl")
+
+# The TaylorPotentials
+include("TaylorPotentials.jl")
 
 # implementations of TBModel, EnHybridModel, FrcHybridModel
 include("qmmodels.jl")

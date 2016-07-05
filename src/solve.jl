@@ -8,7 +8,7 @@ import LujiaLt: Model, free_defm_indices, defm2dofs, dofs2defm,
 import LujiaLt.Potentials: nndist, rdim
 import LujiaLt.MDTools: NeighbourList, sites
 
-export solve
+export solve, quick_solve
 
 """
 `preconditioner(m::Model, Y::Matrix)`
@@ -110,7 +110,9 @@ end
 
 
 
+
 end
+
 
 
 
@@ -131,7 +133,7 @@ of free atoms
 function quick_solve( ; X=nothing, Rfree=nothing, Ifree=nothing,
                         V=Potentials.LennardJonesPotential(),
                         show_trace=false, display_result=true,
-                        Optimiser = ConjugateGradient, tol=1e-5 )
+                        tol=1e-5 )  # Optimiser = ConjugateGradient,
    # construct free indices (if not supplied)
    if Ifree == nothing
       if Rfree == nothing
@@ -144,5 +146,5 @@ function quick_solve( ; X=nothing, Rfree=nothing, Ifree=nothing,
    # solve it
    return Solve.solve(model, show_trace=show_trace,
                      display_result=display_result,
-                     Optimiser = Optimiser, tol=tol)
+                     tol=tol)  # Optimiser = Optimiser,
 end
