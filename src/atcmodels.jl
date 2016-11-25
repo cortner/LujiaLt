@@ -45,6 +45,7 @@ type Atm{TV <: SitePotential} <: ACModel
    V::TV
    Ifree::Vector{Int}
    Yref::Matrix{Float64}
+   fext::Matrix{Float64}
    # ------ Atm specific fields: ----------
    vol::Vector{Float64}
 end
@@ -57,7 +58,8 @@ function Atm(; V=nothing, Ra=5.1, defect=:none, lattice=:triangular)
    vol = zeros(nX(geom))
    vol[find(r .< Ra + tight_buffer(V))] = 1.0
    Yref = reference_configuration(geom, V)
-   return Atm(geom, V, Ifree, Yref, vol)
+   fext = zeros(size(Yref))
+   return Atm(geom, V, Ifree, Yref, fext, vol)
 end
 
 # alternative constructor passing X directly, this creates
@@ -71,12 +73,13 @@ label(::Atm) = "ATM"
 
 # evaluate the energy of the model
 evaluate(m::Atm, dofs::Vector{Float64}) =
-    at_energy_diff(m.V, dofs2defm(m, dofs), m.Yref, m.vol)
+    ( at_energy_diff(m.V, dofs2defm(m, dofs), m.Yref, m.vol)
+      - vecdot(m.fext, dofs2defm(m, dofs) - m.Yref)   )
 
 # evaluate the gradient of the energy of this model
 grad(m::Atm, dofs::Vector{Float64}) =
-    frc2dofs(m, at_energy1(m.V, dofs2defm(m, dofs), m.vol))
-
+    ( frc2dofs(m, at_energy1(m.V, dofs2defm(m, dofs), m.vol))
+      - frc2dofs(m, m.fext) )
 
 
 ##################### B-QCE Model ###################################

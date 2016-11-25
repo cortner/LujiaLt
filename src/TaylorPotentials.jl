@@ -165,13 +165,37 @@ end
 `type QuadraticSiteForce`
 """
 type QuadraticSiteForce <: TSiteForce
-   Z::Matrix{Int}
-   X::Matrix{Float64}
-   A::Matrix{Float64}
+   stencil::Stencil
    coeffs::Array{Float64, 3}    # dim x dim x N
    coeffs2::Array{Float64, 5}   # dim x (dim x N) x (dim x N)
-   rcut::Float64
 end
+
+QuadraticSiteForce(Vqm::TBPotential, stencil::Stencil) =
+   QuadraticSiteForce(stencil,
+                     train_lin(Vqm, stencil),
+                     train_quad(Vqm, stencil) )
+
+
+"""
+Compute the coefficients for a linear approximation to the site force
+"""
+function train_quad(Vqm::TBPotential, stencil::Stencil)
+   # force in reference configuration
+   #    ∂_bn f_a0 = ∂_a0 f_bn
+   d, N = size(stencil)
+   coeffs2 = zeros(d, d, N, d, N)
+   h = 1e-4    # TODO: this should be 1e-4 * rnn
+   for a=1:d, b=1:d, n=1:N
+      stencil.X[a, stencil.I0] += h
+      Fplus = tb_energy1(Vqm, stencil.X)
+      stencil.X[a, stencil.I0] -= 2*h
+      Fminus = tb_energy1(Vqm, stencil.X)
+      coeffs[a, :, :] = (Fplus - Fminus) / (2*h)
+      stencil.X[a, stencil.I0] += h
+   end
+   return coeffs
+end
+
 
 
 # # fast function to evaluate a SiteLinearForce
@@ -186,8 +210,6 @@ end
 #    # do the actual assembly (this returns Frc again)
 #    return mm_frc_lin!(Vmm, U, nlist, Frc)
 # end
-
-
 
 
 end
