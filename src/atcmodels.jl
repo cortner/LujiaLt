@@ -66,7 +66,7 @@ end
 # a geom object without all the detailed information that the
 # "proper" construction provides
 Atm(X::Matrix{Float64}, Ifree::Vector{Int}, V::SitePotential) =
-   Atm(Domain(X), V, Ifree, X, ones(size(X,2)))
+   Atm(Domain(X), V, Ifree, X, zeros(X), ones(size(X,2)))
 
 
 label(::Atm) = "ATM"
