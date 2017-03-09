@@ -60,6 +60,11 @@ function fcut1(r, cutoff)
              .* (0 .< s .< 1) )
 end
 
+function fcut2(r, cutoff)
+   s = 1-(r-cutoff[1]) / (cutoff[2]-cutoff[1])
+   return ((4*30)*s.^3 - (3*60) * s.^2 + (2*30) * s.^1) / (cutoff[2]-cutoff[1])^2 .* (0 .< s .< 1)
+end
+
 
 ### Unused so far, but keep it here for future use
 # """SW-type cutoff function  `function cutoff(r, Rc, lc)`
@@ -97,11 +102,14 @@ LennardJonesPotential(;cutoff=(1.5, 2.1)) = LennardJonesPotential(cutoff)
 
 lj(r) = (r.^(-6) - 1.0).^2 - 1.0
 lj1(r) = -12.0 * (r.^(-6)-1.0) .* r.^(-7)
+lj2(r) = (12*13) * r.^(-14) - (7*12) * r.^(-8)
 lj(r, cutoff) = lj(r) .* fcut(r, cutoff)
 lj1(r, cutoff) = lj1(r) .* fcut(r, cutoff) + lj(r) .* fcut1(r, cutoff)
+lj2(r, cutoff) = lj2(r)  .* fcut(r, cutoff) + 2 * lj1(r) .* fcut1(r, cutoff) + lj(r) .* fcut2(r, cutoff)
 
 evaluate(p::LennardJonesPotential, r, R) = sum( lj(r, p.cutoff) )
 grad(p::LennardJonesPotential, r, R) = R .* (lj1(r, p.cutoff) ./ r)'
+
 
 ########################## Morse Potential MODEL ###############################
 

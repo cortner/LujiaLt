@@ -222,3 +222,24 @@ function add_atom!(geom::Domain, x0::Vector)
    geom.tri = FEM.Triangulation(X)
    return geom
 end
+
+
+"compute lame parameters for given potential"
+function lame_parameters(V::LujiaLt.Potentials.LennardJonesPotential)
+   X, _ = lattice_ball(;R=V.cutoff[2] + 1.1)
+   h = 1e-4
+   dV = r -> LujiaLt.Potentials.lj1(r, V.cutoff)
+   ddV = r -> (dV(r+h) - dV(r-h))/(2*h)
+   μ = 0.0
+   λ = 0.0
+   for n = 1:size(X,2)
+      r = norm(X[:,n])
+      if r > 0
+         μ += 0.25 * (r^2 * ddV(r) - r * dV(r))
+         λ += r * dV(r)
+      end
+   end
+   λ += μ
+   ν = 0.5 * λ / (μ + λ)
+   return μ, λ, ν
+end
