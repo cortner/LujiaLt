@@ -100,11 +100,12 @@ end
 * rnn : bond-length, default derived from at.V
 """
 function plot( at::Atm; X=positions(at), axis = autoaxis(X),
-               plotwidth = 12cm, Img=SVG, rnn = 1.4 * nndist(at.V) )
+               plotwidth = 12cm, Img=SVG, rnn = 1.4 * nndist(at.V),
+               bondwidth=0.7, atomradii=0.2 )
    i, j = uniquepairs(NeighbourList(X, rnn))
    ctx = compose( context(axis),
-                  compose_atoms( X, radii=[0.2], axis=axis ),
-                  compose_bonds( X, (i, j), lwidth=0.7, axis=axis ) )
+                  compose_atoms( X, radii=[atomradii], axis=axis ),
+                  compose_bonds( X, (i, j), lwidth=bondwidth, axis=axis ) )
    draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
    return nothing
 end

@@ -96,9 +96,10 @@ nndist(pot::SitePotential) = 1.0
 
 type LennardJonesPotential <: PairPotential
     cutoff::NTuple{2, Float64}
+    σ::Float64
 end
 
-LennardJonesPotential(;cutoff=(1.5, 2.1)) = LennardJonesPotential(cutoff)
+LennardJonesPotential(;cutoff=(1.5, 2.1), σ=1.0) = LennardJonesPotential(cutoff, σ)
 
 lj(r) = (r.^(-6) - 1.0).^2 - 1.0
 lj1(r) = -12.0 * (r.^(-6)-1.0) .* r.^(-7)
@@ -107,8 +108,8 @@ lj(r, cutoff) = lj(r) .* fcut(r, cutoff)
 lj1(r, cutoff) = lj1(r) .* fcut(r, cutoff) + lj(r) .* fcut1(r, cutoff)
 lj2(r, cutoff) = lj2(r)  .* fcut(r, cutoff) + 2 * lj1(r) .* fcut1(r, cutoff) + lj(r) .* fcut2(r, cutoff)
 
-evaluate(p::LennardJonesPotential, r, R) = sum( lj(r, p.cutoff) )
-grad(p::LennardJonesPotential, r, R) = R .* (lj1(r, p.cutoff) ./ r)'
+evaluate(p::LennardJonesPotential, r, R) = sum( lj(r/p.σ, p.cutoff) )
+grad(p::LennardJonesPotential, r, R) = (R/p.σ) .* (lj1(r/p.σ, p.cutoff) ./ (r/p.σ))' / p.σ
 
 
 ########################## Morse Potential MODEL ###############################

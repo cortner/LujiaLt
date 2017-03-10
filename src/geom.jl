@@ -103,8 +103,8 @@ Domain(X::Matrix{Float64}) = Domain(Matrix{Int}(), Vector{Int}(),
 
 
 function Domain(; A=nothing, Ra=5.0, Rc=0.0,
-                lattice=:triangular, defect=:none, shape=:ball,
-                meshparams = [1.5; 3.0], x0 = :auto )
+                lattice=:triangular, defect=:none, shape = :ball,
+                meshparams = [1.5; 3.0], x0 = :auto, V = nothing )
 
    if shape != :ball
       error("Domain: `shape` parameter allows only `:ball` at present")
@@ -121,7 +121,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
     # default defect core position
     if x0 == :auto
       x0 = [0.0; 0.0]
-      if defect == :screw
+      if defect == :screw || defect == :edge
          x0 = [0.5; sqrt(3)/4]
       end
       if defect == :interstitial
@@ -149,6 +149,10 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
       mark = [mark; mark_c]
    end
 
+   # shift the origin into 0
+   X = X .- x0
+   x0 = [0.0;0.0]
+
     # create a Triangulation object without actual triangulation
     # the proper triangulation will be created after we add the defects
     X = reshape(X, 2, length(X) ÷ 2)
@@ -168,7 +172,9 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
             I0 = find( dist(X) .< 0.1 )
             remove_atom!(geom, I0[1])
         elseif defect == :interstitial
-            add_atom!(geom, [0.5;0.0])
+            add_atom!(geom, x0)
+         elseif defect == :edge
+            edge_predictor!(geom, AA, V)
         elseif defect == :none
             geom.tri = FEM.Triangulation(X)
         else
@@ -213,7 +219,7 @@ function remove_atom!(geom::Domain, idx)
 end
 
 
-"remove an atom from the geometry, usually to create a vacancy"
+"add an atom to the geometry, usually to create an interstitial"
 function add_atom!(geom::Domain, x0::Vector)
    X = [positions(geom) x0]
    geom.mark = [geom.mark; 0]
@@ -222,6 +228,10 @@ function add_atom!(geom::Domain, x0::Vector)
    geom.tri = FEM.Triangulation(X)
    return geom
 end
+
+
+
+#    DISLOCATION STUFF
 
 
 "compute lame parameters for given potential"
@@ -242,4 +252,70 @@ function lame_parameters(V::LujiaLt.Potentials.LennardJonesPotential)
    λ += μ
    ν = 0.5 * λ / (μ + λ)
    return μ, λ, ν
+end
+
+
+function nndist(V::LujiaLt.Potentials.LennardJonesPotential)
+   X, _ = lattice_ball(;R=V.cutoff[2] + 1.1)
+   rr = sumabs2(X, 1) |> sqrt
+   dV = r -> r > 0 ? LujiaLt.Potentials.lj1(r, V.cutoff) : 0.0
+   stress = t -> sum([ t*r * dV(t*r)  for r in rr ])
+   t1 = 1.0; s1 = stress(t1)
+   t2 = 0.95; s2 = stress(t2)
+   while abs(s2) > 1e-8
+      tnew = t2 - s2 * (t2 - t1) / (s2 - s1)
+      t2, t1 = tnew, t2
+      s2, s1 = stress(t2), s2
+   end
+   return t2
+end
+
+"isotropic CLE edge dislocation solution"
+function ulin_edge_isotropic(X, b, ν)
+    x, y = X[1,:], X[2,:]
+    r² = x.^2 + y.^2
+    r = sqrt(r²)
+    ux = b/(2*π) * ( angle(x + im*y) + (x .* y) ./ (2*(1-ν) * r²) )
+    uy = -b/(2*π) * ( (1-2*ν)/(4*(1-ν)) * log(r²) + - 2 * y.^2 ./ (4*(1-ν) * r²) )
+    return [ux; uy]
+end
+
+
+
+"lattice corrector to CLE edge solution"
+function xi_solver(Y::Vector, b; TOL = 1e-10, maxnit = 5)
+   ξ1(x::Real, y::Real, b) = x - b * angle(x + im * y) / (2*π)
+   dξ1(x::Real, y::Real, b) = 1 + b * y / (x^2 + y^2) / (2*π)
+    y = Y[2]
+    x = y
+    for n = 1:maxnit
+        f = ξ1(x, y, b) - Y[1]
+        if abs(f) <= TOL; break; end
+        x = x - f / dξ1(x, y, b)
+    end
+    if abs(ξ1(x, y, b) - Y[1]) > TOL
+        warn("newton solver did not converge; returning input")
+        return Y
+    end
+    return [x, y]
+end
+
+"Ehrlacher/Ortner/Shapeev edge dislocation solution"
+function ulin_edge_eos(X, b, ν)
+    Xmod = zeros(X)
+    for n = 1:size(X,2)
+        Xmod[:, n] = xi_solver(X[:,n], b)
+    end
+    return ulin_edge_isotropic(Xmod, b, ν)
+end
+
+# TODO: generalise this method to arbitrary potentials!
+function edge_predictor!(geom::Domain, A::Matrix, V::LujiaLt.Potentials.LennardJonesPotential)
+   @assert vecnorm(A - Atri) < 1e-10
+   X = positions(geom)
+   b = nndist(V)
+   X *= b
+   X += ulin_edge_eos(X, b, 0.25)
+   geom.tri = FEM.Triangulation(X)
+   return geom
 end

@@ -52,7 +52,7 @@ end
 
 # default constructor for Atm
 function Atm(; V=nothing, Ra=5.1, defect=:none, lattice=:triangular)
-   geom = Domain(Ra = Ra + 2 * tight_buffer(V), defect=defect, lattice=lattice)
+   geom = Domain(Ra = Ra + 2 * tight_buffer(V), defect=defect, lattice=lattice, V=V)
    r = dist(positions(geom))
    Ifree = find(r .< Ra)
    vol = zeros(nX(geom))
