@@ -137,6 +137,9 @@ include("solve.jl")
 # some auxliary plotting functionality (needs to be defined after Domain)
 include("plotting.jl")
 
+# computing errors
+include("error_analysis.jl")
+
 # codes to help test the package
 include("testing.jl")
 

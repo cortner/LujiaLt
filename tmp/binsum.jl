@@ -1,7 +1,8 @@
-"""`binsum` : this is a placeholder for a more general function, 
+"""
+`binsum` : this is a placeholder for a more general function, 
 `binsum`, which still needs to be written!
 
-The current version supports  `B = simple_binsum(i, A)` 
+The current version supports  `B = simple_binsum(i, A)`
 
 * if `i` is a vector of integers and `A` is a vector, then `B` is a vector
 of length `maximum(i)` with `B[n]` containing the sum of entries `A[t]` such that
@@ -58,12 +59,12 @@ function binsum{TI <: Integer, TF <: AbstractFloat, N}(i::Vector{TI},
 
     m = prod(szA[1:dim-1])
     nd = size(A, dim)
-    
+
     for nA = 1:length(A)
         id = mod( div(nA, m), nd ) + 1
         nB = nA - m * (id-1) + m * (i[id]-1)
         B[nB] += A[nA]
-    end    
+    end
 end
 
 
