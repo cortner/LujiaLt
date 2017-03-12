@@ -46,19 +46,27 @@ A basic C^{2,1} cut-off potential; Arguments:
 * p(s) = 6 * (1-s)^5 - 15 * (1-s)^4 + 10 * (1-s)^3
 
 """
-function fcut(r, cutoff)
+function fcut(r::Real, cutoff)
     s = 1 - (r-cutoff[1]) / (cutoff[2]-cutoff[1])
-    return ((s .>= 1) + (0 .<= s .< 1) .* (6 * s.^5 - 15 * s.^4 + 10 * s.^3) )
+    s³  = s * s * s
+    f = s³ * (10.0 + s * (-15.0 + s * 6.0))
+    return (s >= 1) + (0 <= s < 1) * f
 end
+
+fcut(r::AbstractVector, cutoff) = [fcut(t, cutoff) for t in r]
+
 
 """
 Derivative of `cut`; see documentation of `cut`.
 """
-function fcut1(r, cutoff)
+function fcut1(r::Real, cutoff)
     s = 1-(r-cutoff[1]) / (cutoff[2]-cutoff[1])
-    return ( - (30*s.^4 - 60 * s.^3 + 30 * s.^2) / (cutoff[2]-cutoff[1])
-             .* (0 .< s .< 1) )
+    f = s*s * (30.0 + s * (-60.0 + s * 30.0))
+    return (- f) / (cutoff[2]-cutoff[1]) * (0 .< s .< 1)
 end
+
+fcut1(r::AbstractVector, cutoff) = [fcut1(t, cutoff) for t in r]
+
 
 function fcut2(r, cutoff)
    s = 1-(r-cutoff[1]) / (cutoff[2]-cutoff[1])
@@ -101,8 +109,22 @@ end
 
 LennardJonesPotential(;cutoff=(1.5, 2.1), σ=1.0) = LennardJonesPotential(cutoff, σ)
 
-lj(r) = (r.^(-6) - 1.0).^2 - 1.0
-lj1(r) = -12.0 * (r.^(-6)-1.0) .* r.^(-7)
+function lj(r::Real)
+   t = 1/r
+   t³ = t*t*t
+   t⁶ = t³ * t³
+   return (t⁶ - 2.0) * t⁶
+end
+
+function lj1(r::Real)
+   t = 1/r
+   t³ = t*t*t
+   t⁶ = t³ * t³
+   return -12.0 * (t⁶ - 1.0) * t⁶ * t
+end
+
+lj(r::AbstractVector) = [lj(s) for s in r]
+lj1(r::AbstractVector) = [lj1(s) for s in r]
 lj2(r) = (12*13) * r.^(-14) - (7*12) * r.^(-8)
 lj(r, cutoff) = lj(r) .* fcut(r, cutoff)
 lj1(r, cutoff) = lj1(r) .* fcut(r, cutoff) + lj(r) .* fcut1(r, cutoff)

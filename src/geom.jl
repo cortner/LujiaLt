@@ -104,7 +104,8 @@ Domain(X::Matrix{Float64}) = Domain(Matrix{Int}(), Vector{Int}(),
 
 function Domain(; A=nothing, Ra=5.0, Rc=0.0,
                 lattice=:triangular, defect=:none, shape = :ball,
-                meshparams = [1.5; 3.0], x0 = :auto, V = nothing )
+                meshparams = [1.5; 3.0], x0 = :auto, V = nothing,
+                edgevacancy=false )
 
    if shape != :ball
       error("Domain: `shape` parameter allows only `:ball` at present")
@@ -175,6 +176,12 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
             add_atom!(geom, x0)
          elseif defect == :edge
             edge_predictor!(geom, AA, V)
+            if edgevacancy
+               Xnew = positions(geom)
+               rnew = sumabs2(Xnew, 1) |> sqrt
+               I0 = find(rnew .< 1)
+               remove_atom!(geom, I0[2])
+            end
         elseif defect == :none
             geom.tri = FEM.Triangulation(X)
         else

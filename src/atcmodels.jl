@@ -3,7 +3,7 @@
 import .Potentials: SitePotential, StandardSitePotential, rdim, cutoff, nndist
 import .FEM: Triangulation, elements
 
-export BQCE, Atm, label
+export BQCE, Atm, label, forces
 
 
 "return a string label that described the model"
@@ -51,12 +51,13 @@ type Atm{TV <: SitePotential} <: ACModel
 end
 
 # default constructor for Atm
-function Atm(; V=nothing, Ra=5.1, defect=:none, lattice=:triangular)
-   geom = Domain(Ra = Ra + 2 * tight_buffer(V), defect=defect, lattice=lattice, V=V)
+function Atm(; V=nothing, Ra=5.1, kwargs...)
+   Rbuf = 2 * tight_buffer(V) + 1.2
+   geom = Domain(;Ra = Ra + Rbuf, V=V, kwargs...)
    r = dist(positions(geom))
    Ifree = find(r .< Ra)
    vol = zeros(nX(geom))
-   vol[find(r .< Ra + tight_buffer(V))] = 1.0
+   vol[find(r .< Ra + tight_buffer(V) + 0.1)] = 1.0
    Yref = reference_configuration(geom, V)
    fext = zeros(size(Yref))
    return Atm(geom, V, Ifree, Yref, fext, vol)
@@ -80,6 +81,19 @@ evaluate(m::Atm, dofs::Vector{Float64}) =
 grad(m::Atm, dofs::Vector{Float64}) =
     ( frc2dofs(m, at_energy1(m.V, dofs2defm(m, dofs), m.vol))
       - frc2dofs(m, m.fext) )
+
+"""
+returns forces as `d x N` matrix, with all forces on fixed atoms set to zero
+"""
+function forces(at::Atm, X::Matrix{Float64})
+    F = - LujiaLt.at_energy1(at.V, X, at.vol)
+    Ifix = setdiff(1:nX(at), at.Ifree)
+    F[:, Ifix] = 0.0
+    return F
+end
+
+forces(at::Atm) = forces(at, at.Yref)
+
 
 
 ##################### B-QCE Model ###################################

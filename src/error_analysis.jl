@@ -25,7 +25,6 @@ fdiff(U, E) = U[:, E[1,:][:]] - U[:, E[2,:][:]]
 
 function H1seminorm(tri, U)
    E = FEM.edges(tri)
-   @show size(E), typeof(E)
    DU = fdiff(U, E)
    DX = fdiff(tri.X, E)
    return (sumabs2(DU, 1) ./ sumabs2(DX, 1)) |> sum |> sqrt

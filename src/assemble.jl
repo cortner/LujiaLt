@@ -74,6 +74,27 @@ at_energy1(V::SitePotential, X::Matrix{Float64}) =
     at_energy1(V, X, ones(size(X, 2)))
 
 
+# using LujiaLt.Potentials: LennardJonesPotential, lj1
+#
+# # a faster assembly for the Lennard-Jones potential
+# function LujiaLt.at_energy1(V::LennardJonesPotential, X::Matrix{Float64}, vol::Vector{Float64})
+#  nlist = NeighbourList(X, cutoff(V))
+#  dE = zeros(X)
+#  rdim = size(X,1)
+#  for (n, neigs, r, R) in sites(nlist)
+#     if vol[n] <= 0.0; continue; end
+#     for (j, r, R) in zip(neigs, r, R)
+#        dV = vol[n] * lj1(r, V.cutoff)
+#        for a = 1:rdim
+#           dE[a, j] += dV
+#           dE[a, n] -= dV
+#        end
+#     end
+#  end
+#  return dE
+# end
+
+
 
 """
 `getR_cb(Aref::Matrix, V::SitePotential)`
