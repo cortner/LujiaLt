@@ -44,3 +44,12 @@ function error_energynorm(Y, at, Ylge, atlge)
    # compute and return errors
    return H1seminorm(atlge.geom.tri, Ulge - Uext)
 end
+
+
+function error_energynorm(Y, X::Matrix, Ylge, Xlge::Matrix)
+   U, Ulge = Y - X, Ylge - Xlge
+   Uext = extend(Xlge, X, U)
+   tri = FEM.Triangulation(Xlge)
+   # compute and return errors
+   return H1seminorm(tri, Ulge - Uext)
+end

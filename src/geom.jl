@@ -105,7 +105,7 @@ Domain(X::Matrix{Float64}) = Domain(Matrix{Int}(), Vector{Int}(),
 function Domain(; A=nothing, Ra=5.0, Rc=0.0,
                 lattice=:triangular, defect=:none, shape = :ball,
                 meshparams = [1.5; 3.0], x0 = :auto, V = nothing,
-                edgevacancy=false )
+                edgevacancy = false, bvec = 1.0, xicorr = true )
 
    if shape != :ball
       error("Domain: `shape` parameter allows only `:ball` at present")
@@ -175,7 +175,7 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
         elseif defect == :interstitial
             add_atom!(geom, x0)
          elseif defect == :edge
-            edge_predictor!(geom, AA, V)
+            edge_predictor!(geom, AA, V; b=bvec, xicorr=xicorr)
             if edgevacancy
                Xnew = positions(geom)
                rnew = sumabs2(Xnew, 1) |> sqrt
@@ -317,12 +317,16 @@ function ulin_edge_eos(X, b, ν)
 end
 
 # TODO: generalise this method to arbitrary potentials!
-function edge_predictor!(geom::Domain, A::Matrix, V::LujiaLt.Potentials.LennardJonesPotential)
+function edge_predictor!(geom::Domain, A::Matrix, V::LujiaLt.Potentials.LennardJonesPotential; b = nndist(V),
+      xicorr = true)
    @assert vecnorm(A - Atri) < 1e-10
    X = positions(geom)
-   b = nndist(V)
    X *= b
-   X += ulin_edge_eos(X, b, 0.25)
+   if xicorr
+      X += ulin_edge_eos(X, b, 0.25)
+   else
+      X += ulin_edge_isotropic(X, b, 0.25)
+   end
    geom.tri = FEM.Triangulation(X)
    return geom
 end

@@ -10,10 +10,27 @@ import LujiaLt.FEM: Triangulation, elements
 
 export plot
 
-const ljatcol = "tomato"
-const ljbondcol = "darkblue"
+# const ljatcol = "tomato"
+# const ljbondcol = "darkblue"
+# const ljlinecol = "darkblue"
+# const ljelcol = "aliceblue"
+
+const ljatcol = RGB(78/255,115/255,174/255)
+const ljqmcol = RGB(194/255, 79/255, 84/255)
+const ljbufcol = RGB(129/255,116/255,176/255)
+const ljbondcol = RGB(0.35, 0.35, 0.35)
+const ljclampcol = ljbondcol
 const ljlinecol = "darkblue"
 const ljelcol = "aliceblue"
+
+
+# \definecolor{sred}{RGB}{194,79,84}
+# \definecolor{sblue}{RGB}{78,115,174}
+# \definecolor{sgreen}{RGB}{88,167,106}
+# \definecolor{spurple}{RGB}{129,116,176}
+# \definecolor{sbeige}{RGB}{203,184,120}
+# \definecolor{sturquoise}{RGB}{103,181,204}
+
 
 
 "return a reasonable choice for the plotting axis"
@@ -38,9 +55,11 @@ relative_height(ax, width) = (ax[4]-ax[3])/(ax[2]-ax[1]) * width
 relative_width(ax, height) = (ax[2]-ax[1])/(ax[4]-ax[3]) * height
 
 compose_atoms(X; radii=[0.2], lwidth=0.3, axis=autoaxis(X),
-                  fillcolor=ljatcol, linecolor=ljbondcol ) =
-   ( context(axis), circle(X[1,:][:], X[2,:][:], radii),
-     stroke(linecolor), linewidth(lwidth), fill(fillcolor) )
+                  fillcolor=ljatcol, linecolor=ljbondcol ) = (
+   length(X) > 0 ?
+         ( context(axis), circle(X[1,:][:], X[2,:][:], radii),
+           stroke(linecolor), linewidth(lwidth), fill(fillcolor) )
+   : (context(axis),) )
 
 nanvec(dim::Integer) = NaN * ones(dim)
 
@@ -68,6 +87,18 @@ function compose_bonds(X, B; lwidth=1.0, linecolor=ljbondcol,
 end
 
 
+# function compose_core(X, B, rdef)
+#    nX = size(X,2)
+#    r = sumabs2(X, 1) |> sqrt
+#    nneigs = zeros(Int, nX)
+#    for n = 1:length(B[1])
+#       nneigs[B[1][n]] += 1
+#       nneigs[B[2][n]] += 1
+#    end
+#    Icore = find( (nneigs .!= 6) .* (r .<= rdef) )
+# end
+
+
 # ########################## PLOTTING ############################
 
 
@@ -83,9 +114,26 @@ function compose_elements(tri::Triangulation; X = tri.X, axis=autoaxis(X),
             stroke(linecol), linewidth(lwidth) )
 end
 
+compose_bg(axis, bg) = (
+   bg ? (compose(context(axis), rectangle()), fill("white")) :
+   (context(axis),) )
 
 
 
+function Compose.compose(at::Atm; X=positions(at), axis = autoaxis(X),
+               rnn = 1.4 * nndist(at.V), bondwidth=0.7, atomradii=0.2,
+               Ibdry = Int[], bg = false )
+   Iint = setdiff(1:size(X, 2), Ibdry)
+   i, j = uniquepairs(NeighbourList(X, rnn))
+   ctx = compose( context(axis),
+                  compose_atoms( X[:,Ibdry], radii = [atomradii * 0.6],
+                                 axis=axis, fillcolor=ljclampcol, lwidth=0.1 ),
+                  compose_atoms( X[:, Iint], radii=[atomradii], axis=axis ),
+                  compose_bonds( X, (i, j), lwidth=bondwidth, axis=axis ),
+                  compose_bg(axis, bg)
+                  )
+   return ctx
+end
 
 
 """
@@ -101,23 +149,27 @@ end
 """
 function plot( at::Atm; X=positions(at), axis = autoaxis(X),
                plotwidth = 12cm, Img=SVG, rnn = 1.4 * nndist(at.V),
-               bondwidth=0.7, atomradii=0.2 )
-   i, j = uniquepairs(NeighbourList(X, rnn))
-   ctx = compose( context(axis),
-                  compose_atoms( X, radii=[atomradii], axis=axis ),
-                  compose_bonds( X, (i, j), lwidth=bondwidth, axis=axis ) )
-   draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
+               bondwidth=0.7, atomradii=0.2, filename = nothing, IMG=PDF,
+               Ibdry = Int[], plotheight= relative_height(axis, plotwidth)
+                )
+   ctx = compose(at, X=X, axis=axis, rnn=rnn, bondwidth=bondwidth,
+                     atomradii=atomradii, Ibdry=Ibdry)
+   if filename == nothing
+      draw( Img(plotwidth, plotheight), ctx )
+   else
+      draw( IMG(filename, plotwidth, plotheight), ctx )
+   end
    return nothing
 end
 
 
 function plot( tri::Triangulation; axis = autoaxis(tri.X),
                plotwidth = 12cm, Img=SVG, elcol = ljelcol, linecol=ljbondcol,
-               lwidth=0.5 )
+               lwidth=0.5, plotheight= relative_height(axis, plotwidth))
    ctx = compose( context(axis),
                   compose_elements(tri, elcol=elcol, linecol=linecol,
                                     axis=axis, lwidth=lwidth ) )
-   draw( Img(plotwidth, relative_height(axis, plotwidth)), ctx )
+   draw( Img(plotwidth, plotheight), ctx )
    return nothing
 end
 

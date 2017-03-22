@@ -21,7 +21,7 @@ include("utils.jl")
 include("mdtools.jl")
 
 # some simple mad-up interatomic potentials
-include("potentials.jl")
+include("Potentials.jl")
 import .Potentials.SitePotential
 
 include("tightbinding.jl")
