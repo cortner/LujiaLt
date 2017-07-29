@@ -105,7 +105,8 @@ Domain(X::Matrix{Float64}) = Domain(Matrix{Int}(), Vector{Int}(),
 function Domain(; A=nothing, Ra=5.0, Rc=0.0,
                 lattice=:triangular, defect=:none, shape = :ball,
                 meshparams = [1.5; 3.0], x0 = :auto, V = nothing,
-                edgevacancy = false, bvec = 1.0, xicorr = true )
+                edgevacancy = false, bvec = 1.0, xicorr = true,
+                ν = :auto )
 
    if shape != :ball
       error("Domain: `shape` parameter allows only `:ball` at present")
@@ -175,7 +176,11 @@ function Domain(; A=nothing, Ra=5.0, Rc=0.0,
         elseif defect == :interstitial
             add_atom!(geom, x0)
          elseif defect == :edge
-            edge_predictor!(geom, AA, V; b=bvec, xicorr=xicorr)
+            if ν == :auto
+               edge_predictor!(geom, AA, V; b=bvec, xicorr=xicorr)
+            else
+               edge_predictor!(geom, AA, V; b=bvec, xicorr=xicorr, ν=ν)
+            end 
             if edgevacancy
                Xnew = positions(geom)
                rnew = sumabs2(Xnew, 1) |> sqrt
@@ -240,6 +245,12 @@ end
 
 #    DISLOCATION STUFF
 
+# a=sum_r (r*V'(r)) = 1/6*sum_rho |rho|*V'(|rho|)
+# b=sum_r (r^2*V''(r)) = 1/6*sum_rho |rho|^2*V''(|rho|)
+# mu_eff = 9/4*a+3/4*b
+# lambda_eff = -15/4*a + 3/4*b
+# nu_eff = 1/4 * (b-5*a)/(b-a)
+
 
 "compute lame parameters for given potential"
 function lame_parameters(V::LujiaLt.Potentials.LennardJonesPotential)
@@ -247,17 +258,18 @@ function lame_parameters(V::LujiaLt.Potentials.LennardJonesPotential)
    h = 1e-4
    dV = r -> LujiaLt.Potentials.lj1(r, V.cutoff)
    ddV = r -> (dV(r+h) - dV(r-h))/(2*h)
-   μ = 0.0
-   λ = 0.0
+   a = 0.0
+   b = 0.0
    for n = 1:size(X,2)
       r = norm(X[:,n])
       if r > 0
-         μ += 0.25 * (r^2 * ddV(r) - r * dV(r))
-         λ += r * dV(r)
+         a += r * dV(r) # 0.25 * (r^2 * ddV(r) - r * dV(r))
+         b += r^2 * ddV(r)
       end
    end
-   λ += μ
-   ν = 0.5 * λ / (μ + λ)
+   μ = 9/4 * a + 3/4 * b
+   λ = -15/4 * a + 3/4 * b
+   ν = 0.25 * (b - 5 * a) / (b-a)
    return μ, λ, ν
 end
 
@@ -318,14 +330,15 @@ end
 
 # TODO: generalise this method to arbitrary potentials!
 function edge_predictor!(geom::Domain, A::Matrix, V::LujiaLt.Potentials.LennardJonesPotential; b = nndist(V),
-      xicorr = true)
+      xicorr = true,
+      ν = lame_parameters(V)[3])
    @assert vecnorm(A - Atri) < 1e-10
    X = positions(geom)
    X *= b
    if xicorr
-      X += ulin_edge_eos(X, b, 0.25)
+      X += ulin_edge_eos(X, b, ν)
    else
-      X += ulin_edge_isotropic(X, b, 0.25)
+      X += ulin_edge_isotropic(X, b, ν)
    end
    geom.tri = FEM.Triangulation(X)
    return geom
